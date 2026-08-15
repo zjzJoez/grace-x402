@@ -1,0 +1,185 @@
+<mxfile host="app.diagrams.net" agent="GRACE" version="24.7.17">
+  <diagram name="GRACE Architecture" id="grace-arch">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="GRACE — a cooling-off rail for agentic payments" style="text;html=1;fontSize=26;fontStyle=1;align=left;verticalAlign=middle;fontColor=#1A1A1A;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="900" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="x402 scheme extension `exact-deferred` on XSGD (EIP-3009) · Avalanche C-Chain mainnet · no smart contract deployed" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;fontColor=#5A6472;" vertex="1" parent="1">
+          <mxGeometry x="40" y="56" width="1000" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- ============ LANE 1: ACTORS ============ -->
+        <mxCell id="laneActors" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#D6DEE8;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="380" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="laneActorsLbl" value="AI BUYER SIDE" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#8A94A6;align=left;" vertex="1" parent="1">
+          <mxGeometry x="56" y="108" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="human" value="&lt;b&gt;Human&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;gives an instruction, then&lt;br&gt;holds a veto for N seconds&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9C4D4;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="72" y="140" width="150" height="66" as="geometry" />
+        </mxCell>
+
+        <mxCell id="brain" value="&lt;b&gt;Purchase brain&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;Claude on Amazon Bedrock&lt;br&gt;claude-3-haiku · ap-southeast-1&lt;br&gt;&lt;i&gt;approve / reject + reason&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4E6;strokeColor=#F0A030;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="242" y="140" width="160" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent" value="&lt;b&gt;Buyer agent&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;x402 client (grace/agent.mjs)&lt;br&gt;signs EIP-3009 ReceiveWithAuthorization&lt;br&gt;&lt;b&gt;validAfter = now + coolingOffSeconds&lt;/b&gt;&lt;br&gt;nonce = keccak256(order)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4A7DD6;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="72" y="248" width="330" height="96" as="geometry" />
+        </mxCell>
+
+        <mxCell id="phone" value="&lt;b&gt;Buyer confirmation page&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;/pay/:id — countdown + CANCEL&lt;br&gt;signs CancelAuthorization (meta-tx)&lt;br&gt;&lt;i&gt;wallet needs zero AVAX&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE8E8;strokeColor=#D45B5B;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="72" y="386" width="330" height="86" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wallet" value="&lt;b&gt;Payer wallet&lt;/b&gt; — XSGD never leaves it during the window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9C4D4;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="72" y="502" width="330" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- ============ LANE 2: MERCHANT / AWS ============ -->
+        <mxCell id="laneAws" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9F0;strokeColor=#F0A030;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="100" width="560" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="laneAwsLbl" value="MERCHANT SIDE — AWS ap-southeast-1 (deployed)" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#C07800;align=left;" vertex="1" parent="1">
+          <mxGeometry x="486" y="108" width="400" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ec2" value="&lt;b&gt;EC2 t3.small — merchant service&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472;text-align:left;padding-left:14px&quot;&gt;POST /checkout → 402 challenge&lt;br&gt;&amp;nbsp;&amp;nbsp;scheme: &lt;b&gt;exact-deferred&lt;/b&gt;, extra.coolingOffSeconds (per SKU)&lt;br&gt;POST /checkout + PAYMENT-SIGNATURE → verify &amp;amp; accept&lt;br&gt;GET /console · GET /pay/:id · GET / (storefront)&lt;br&gt;&lt;i&gt;holds the only private keys; generated on the box&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F0A030;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="496" y="140" width="380" height="118" as="geometry" />
+        </mxCell>
+
+        <mxCell id="console" value="&lt;b&gt;Merchant console&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;live queue · countdown&lt;br&gt;SETTLE button shows the&lt;br&gt;chain's own verdict&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9C4D4;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="896" y="140" width="118" height="118" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sched" value="&lt;b&gt;EventBridge Scheduler&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;one-shot per order&lt;br&gt;&lt;b&gt;at(validAfter + 2s)&lt;/b&gt;&lt;br&gt;ActionAfterCompletion=DELETE&lt;br&gt;+ rate(1 min) sweep fallback&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4E6;strokeColor=#F0A030;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="496" y="296" width="230" height="96" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lambda" value="&lt;b&gt;Lambda: grace-autopilot&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;rings the settle endpoint&lt;br&gt;&lt;b&gt;holds zero keys&lt;/b&gt;&lt;br&gt;chain is the only authority&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4E6;strokeColor=#F0A030;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="766" y="296" width="230" height="96" as="geometry" />
+        </mxCell>
+
+        <mxCell id="awsnote" value="The merchant never presses a button.&#10;AWS settles whatever the human did not veto." style="text;html=1;fontSize=12;fontStyle=2;fontColor=#C07800;align=center;" vertex="1" parent="1">
+          <mxGeometry x="496" y="410" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ssm" value="SSM — keyless ops (deploy, logs, fund recycling)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#D6DEE8;fontSize=11;fontColor=#5A6472;" vertex="1" parent="1">
+          <mxGeometry x="496" y="466" width="500" height="34" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s3" value="S3 — build artifact (presigned pull at boot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#D6DEE8;fontSize=11;fontColor=#5A6472;" vertex="1" parent="1">
+          <mxGeometry x="496" y="510" width="500" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ============ LANE 3: CHAIN ============ -->
+        <mxCell id="laneChain" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF7F1;strokeColor=#3E9E6A;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="100" width="470" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="laneChainLbl" value="THE ONLY BACKEND — Avalanche C-Chain mainnet (43114)" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#2E7D52;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1096" y="108" width="440" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="xsgd" value="&lt;b&gt;XSGD — FiatTokenV2_2 (EIP-3009)&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;0xb2F85b7AB3c2b6f62DF06dE6aE7D09c010a5096E&lt;br&gt;&lt;i&gt;already deployed by StraitsX — we add nothing&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3E9E6A;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1106" y="140" width="418" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="recv" value="&lt;b&gt;receiveWithAuthorization&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;requires msg.sender == payee&lt;br&gt;&lt;b&gt;only the merchant can cash it&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9C4D4;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1106" y="228" width="200" height="72" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cancel" value="&lt;b&gt;cancelAuthorization&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472&quot;&gt;signed by the authorizer&lt;br&gt;&lt;b&gt;only the payer can void it&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9C4D4;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1324" y="228" width="200" height="72" as="geometry" />
+        </mxCell>
+
+        <mxCell id="states" value="&lt;b&gt;Four states — enforced by the token, not by us&lt;/b&gt;&lt;div style=&quot;font-size:11px;color:#5A6472;text-align:left;padding-left:16px&quot;&gt;&lt;br&gt;&lt;b&gt;cooling-off&lt;/b&gt; → &quot;FiatTokenV2: authorization is not yet valid&quot;&lt;br&gt;&lt;b&gt;settleable&lt;/b&gt; → simulation passes, merchant may cash&lt;br&gt;&lt;b&gt;void&lt;/b&gt; → &quot;authorization is used or canceled&quot; (forever)&lt;br&gt;&lt;b&gt;expired&lt;/b&gt; → &quot;authorization is expired&quot;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3E9E6A;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="1106" y="320" width="418" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="events" value="&lt;b&gt;AuthorizationUsed / AuthorizationCanceled(authorizer, nonce)&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;color:#5A6472&quot;&gt;nonce = keccak256(order) → every outcome is a public, self-describing audit record&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF7F1;strokeColor=#3E9E6A;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1106" y="466" width="418" height="66" as="geometry" />
+        </mxCell>
+
+        <!-- ============ FLOWS ============ -->
+        <mxCell id="f1" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#4A7DD6;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="human" target="agent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f1l" value="1 instruction" style="edgeLabel;html=1;fontSize=10;fontColor=#4A7DD6;" vertex="1" connectable="0" parent="f1">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f2" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#F0A030;strokeWidth=2;endArrow=block;dashed=1;" edge="1" parent="1" source="agent" target="brain">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f2l" value="2 approve?" style="edgeLabel;html=1;fontSize=10;fontColor=#C07800;" vertex="1" connectable="0" parent="f2">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f3" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#4A7DD6;strokeWidth=2;endArrow=block;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="agent" target="ec2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f3l" value="3 POST /checkout → 402 → sign → retry" style="edgeLabel;html=1;fontSize=10;fontColor=#4A7DD6;" vertex="1" connectable="0" parent="f3">
+          <mxGeometry x="-0.1" y="-1" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f4" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#F0A030;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="ec2" target="sched">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f4l" value="4 schedule at(validAfter)" style="edgeLabel;html=1;fontSize=10;fontColor=#C07800;" vertex="1" connectable="0" parent="f4">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f5" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#F0A030;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="sched" target="lambda">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f5l" value="5 wake" style="edgeLabel;html=1;fontSize=10;fontColor=#C07800;" vertex="1" connectable="0" parent="f5">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f6" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#F0A030;strokeWidth=2;endArrow=block;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="lambda" target="ec2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f6l" value="6 settle" style="edgeLabel;html=1;fontSize=10;fontColor=#C07800;" vertex="1" connectable="0" parent="f6">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f7" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#3E9E6A;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="ec2" target="recv">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1050" y="199" /><mxPoint x="1050" y="264" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f7l" value="7 receiveWithAuthorization" style="edgeLabel;html=1;fontSize=10;fontColor=#2E7D52;" vertex="1" connectable="0" parent="f7">
+          <mxGeometry x="0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f8" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#D45B5B;strokeWidth=2;endArrow=block;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="phone" target="cancel">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1424" y="429" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f8l" value="X cancelAuthorization (any relayer pays the gas)" style="edgeLabel;html=1;fontSize=10;fontColor=#D45B5B;" vertex="1" connectable="0" parent="f8">
+          <mxGeometry x="-0.3" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="f9" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeColor=#B9C4D4;strokeWidth=1;endArrow=block;dashed=1;" edge="1" parent="1" source="ec2" target="phone">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="450" y="199" /><mxPoint x="450" y="429" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f9l" value="confirm URL" style="edgeLabel;html=1;fontSize=10;fontColor=#8A94A6;" vertex="1" connectable="0" parent="f9">
+          <mxGeometry relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- ============ FOOTER: the asymmetry ============ -->
+        <mxCell id="foot" value="&lt;b&gt;The asymmetry IS the product&lt;/b&gt;&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp; only the merchant can cash it &amp;nbsp;·&amp;nbsp; only the payer can void it &amp;nbsp;·&amp;nbsp; nobody can do both &amp;nbsp;·&amp;nbsp; no escrow, no custodian, no new contract&lt;br&gt;&lt;span style=&quot;font-size:12px;color:#5A6472&quot;&gt;The money never leaves the payer's wallet during the window, so reversal costs nothing — nothing moved. Settlement, once it happens, is final.&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#B9C4D4;fontSize=14;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="596" width="1510" height="66" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
