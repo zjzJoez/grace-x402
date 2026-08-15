@@ -1,5 +1,5 @@
 {
-  "_comment": "Plain-spoken narration. The screen carries the technical detail — the revert string, the contract address, the rail — so the voice does not have to. `lines` are the on-screen captions, shown in order across the beat, split proportionally by length.",
+  "_comment": "Three stages: the agent's terminal, the merchant screen, the payer's phone. Every line narrates the exact thing on screen at that moment. ~165 words ≈ 58s at Louis's pace.",
   "voice": {
     "id": "rOVKXrU0YcQMzmTNwaDq",
     "name": "Louis — crisp, Singaporean",
@@ -7,70 +7,72 @@
   },
   "beats": [
     {
-      "id": "problem",
-      "cue": "idle screen",
-      "text": "Your AI assistant just bought something for you. Did you actually want it? The shop can't tell either. And there is no rule anywhere for \"my assistant did it\" — so most shops would rather not take that order at all.",
+      "id": "terminal",
+      "cue": "/stage/terminal — command types itself, real agent output streams in, APPROVE highlighted",
+      "text": "This is a shopping agent buying a T-shirt. Its AI brain checks the deal, approves it, and pays. Real Singapore dollars, live on Avalanche. Now watch what makes this payment different.",
       "lines": [
-        "Your AI assistant just bought something for you.",
-        "Did you actually want it? The shop can't tell either.",
-        "There's no rule anywhere for \"my assistant did it\" —",
-        "so most shops would rather not take the order at all."
+        "This is a shopping agent, buying a T-shirt.",
+        "Its AI brain checks the deal, approves it — and pays.",
+        "Real Singapore dollars, live on Avalanche.",
+        "Now watch what makes this payment different."
       ]
     },
     {
-      "id": "mechanism",
-      "cue": "agent buys; order appears; countdown starts",
-      "text": "GRACE gives every one of those payments a ninety second pause. The shop gets a signed promise right away. It just can't collect on it yet.",
+      "id": "cooling",
+      "cue": "cut to merchant screen — order card + countdown ring",
+      "text": "This is the shop's screen. The payment has already arrived, signed and locked. But it comes with a built-in pause: for ninety seconds, the shop cannot collect it.",
       "lines": [
-        "GRACE gives every one of those payments a ninety second pause.",
-        "The shop gets a signed promise right away.",
-        "It just can't collect on it yet."
+        "This is the shop's screen. The payment has arrived — signed and locked.",
+        "But it comes with a built-in pause:",
+        "for ninety seconds, the shop cannot collect it."
       ]
     },
     {
-      "id": "settle",
-      "cue": "press SETTLE",
-      "text": "Here is the shop trying to collect early.",
-      "lines": ["Here's the shop trying to collect early."]
-    },
-    {
-      "id": "verdict",
-      "cue": "hold on the revert string",
-      "text": "Not yet valid. That is not our server saying no. That is the money itself refusing.",
+      "id": "refuse",
+      "cue": "click SETTLE anyway — dark slab fills with the revert",
+      "text": "Let the shop try anyway. The money itself refuses. That answer came from the token contract on the blockchain — not from any server of ours.",
       "lines": [
-        "\"Not yet valid.\"",
-        "That's not our server saying no.",
-        "That's the money itself refusing."
+        "Let the shop try anyway —",
+        "the money itself refuses.",
+        "That answer came from the token contract. Not from us."
       ]
     },
     {
-      "id": "cancel",
-      "cue": "press CANCEL; ring turns red",
-      "text": "And during that pause, you can kill it. One tap. That just happened for real, on a live blockchain, with real Singapore dollars.",
+      "id": "phone",
+      "cue": "cut to the phone — countdown + red button, then the tap, then CANCELLED",
+      "text": "Meanwhile, this is your phone. Changed your mind? One tap. That cancellation just went on-chain, permanently. The shop can never collect that payment.",
       "lines": [
-        "And during that pause, you can kill it. One tap.",
-        "That just happened for real, on a live blockchain,",
-        "with real Singapore dollars."
+        "Meanwhile — this is your phone.",
+        "Changed your mind? One tap.",
+        "That cancellation just went on-chain. Permanently."
       ]
     },
     {
       "id": "money",
-      "cue": "the balances, deltas at zero",
-      "text": "Now look at the balance. It never moved. There is nothing to refund, because the money never left your wallet.",
+      "cue": "back to the merchant screen — balance bars, deltas at zero",
+      "text": "And here is the part that matters: your balance never moved. There is nothing to refund, because the money never left your wallet.",
       "lines": [
-        "Now look at the balance. It never moved.",
-        "There's nothing to refund —",
-        "the money never left your wallet."
+        "And here's the part that matters:",
+        "your balance never moved.",
+        "Nothing to refund — the money never left your wallet."
+      ]
+    },
+    {
+      "id": "autopilot",
+      "cue": "scroll to on-chain events — AuthorizationUsed (auto-settled earlier order) glows next to AuthorizationCanceled",
+      "text": "And when you don't object? Amazon's scheduler settles it for you, right on time, and it is final. There is the earlier order — settled on its own, no chargebacks, ever.",
+      "lines": [
+        "And when you don't object?",
+        "Amazon's scheduler settles it for you, right on time. Final.",
+        "There's the earlier order — settled on its own. No chargebacks, ever."
       ]
     },
     {
       "id": "close",
-      "cue": "footer strip, then back to top",
-      "text": "Say nothing, and it goes through on its own, and it is final. Nobody ever held your money. Nobody had to.",
+      "cue": "/stage/end — the card",
+      "text": "GRACE. Nobody ever held your money. Nobody had to.",
       "lines": [
-        "Say nothing, and it goes through on its own. And it's final.",
-        "Nobody ever held your money.",
-        "Nobody had to."
+        "GRACE. Nobody ever held your money. Nobody had to."
       ]
     }
   ]

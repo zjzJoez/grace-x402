@@ -181,7 +181,8 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       $('mVerdict').innerHTML='<span class="cant">cannot cash it — '+left+'s to go</span>';
       $('pVerdict').innerHTML='<span class="can">can void it, unilaterally</span>';
       $('mBtn').innerHTML='<button class="bSettle blocked" onclick="act(\\''+o.id+'\\',\\'settle\\',this)">SETTLE anyway →</button>';
-      $('pBtn').innerHTML='<button class="bCancel" onclick="act(\\''+o.id+'\\',\\'cancel\\',this)">CANCEL AUTHORIZATION · payer pays 0 gas</button>';
+      $('pBtn').innerHTML='<button class="bCancel" onclick="act(\\''+o.id+'\\',\\'cancel\\',this)">CANCEL AUTHORIZATION · payer pays 0 gas</button>'+
+        '<div class="phlink"><a href="/phone?id='+o.id+'">open this on the payer\\'s phone →</a></div>';
       $('mQuote').style.display='block'; $('mQuote').className='quote';
       $('mSaid').textContent='"'+(o.live.reason||'…')+'"';
       $('ringCap').innerHTML='the same number means<br><b>"not yet yours"</b> to the merchant<br>and <b>"still yours"</b> to the payer';

@@ -31,6 +31,7 @@ import { publicClientFor, simulateSettle, settle, broadcastCancel, balanceOf } f
 import { demoWallets, relayerAccount } from './lib/keys.mjs'
 import { consolePage, payPage, storefrontPage } from './pages.mjs'
 import { missionPage } from './mission.mjs'
+import { terminalPage, phonePage, endPage } from './stage.mjs'
 
 const net = pickNetwork()
 const { buyer, merchant } = demoWallets()
@@ -248,6 +249,12 @@ async function doSettle(o) {
 }
 
 async function doCancel(o) {
+  // cancelAuthorization is only meaningful when signed by the order's payer.
+  // Signing with our own buyer key for someone else's order would burn the
+  // wrong (authorizer, nonce) pair — a cosmetic void the chain ignores.
+  if (o.payer.toLowerCase() !== buyer.address.toLowerCase()) {
+    throw new Error(`cancel must be signed by the payer (${o.payer}) — this server only holds keys for ${buyer.address}`)
+  }
   // The buyer signs; the relayer pays the gas. The buyer wallet holds zero AVAX
   // and never needs any — that is the point being demonstrated.
   const cancellation = await signCancellation(buyer, net, o.authorization.nonce)
@@ -336,6 +343,25 @@ const server = createServer(async (req, res) => {
       })
     }
 
+    // Run a purchase AS THIS MERCHANT'S DEMO BUYER, streaming the agent's real
+    // stdout. Exists so a remote demo driver can show the buy in a terminal
+    // while the payer is the wallet whose key lives here — which is the only
+    // wallet this server can honestly cancel for.
+    if (req.method === 'POST' && path === '/api/demo/buy') {
+      const body = JSON.parse((await readBody(req)) || '{}')
+      const sku = CATALOG[body.sku] ? body.sku : 'tee-agentix'
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Transfer-Encoding': 'chunked' })
+      const { spawn } = await import('node:child_process')
+      const child = spawn('node', ['grace/agent.mjs', '--sku', sku, '--server', `http://localhost:${PORT}`,
+        ...(body.brain ? ['--brain'] : []),
+        '--instruction', String(body.instruction ?? `Buy ${sku}`).slice(0, 200)],
+        { cwd: join(ROOT, '..'), env: { ...process.env, AWS_REGION: 'ap-southeast-1' } })
+      child.stdout.on('data', (d) => res.write(d))
+      child.stderr.on('data', (d) => res.write(d))
+      child.on('exit', () => res.end())
+      return
+    }
+
     const m = path.match(/^\/api\/orders\/([0-9a-f]+)\/(settle|cancel)$/)
     if (req.method === 'POST' && m) {
       const o = orders.get(m[1])
@@ -361,6 +387,13 @@ const server = createServer(async (req, res) => {
         url.searchParams.get('theme') ?? process.env.GRACE_THEME ?? 'editorial',
         url.searchParams.has('picker'),
       ))
+    }
+    if (req.method === 'GET' && path === '/stage/terminal') return html(res, terminalPage())
+    if (req.method === 'GET' && path === '/stage/end') return html(res, endPage())
+    if (req.method === 'GET' && path === '/phone') {
+      const id = url.searchParams.get('id') ?? [...orders.values()].sort((a, b) => b.createdAt - a.createdAt)[0]?.id
+      if (!id) return json(res, 404, { error: 'no orders yet' })
+      return html(res, phonePage(id, PUBLIC_URL))
     }
     if (req.method === 'GET' && path === '/console') return html(res, consolePage(net))
     const pay = path.match(/^\/pay\/([0-9a-f]+)$/)
