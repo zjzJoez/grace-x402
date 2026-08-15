@@ -17,3 +17,6 @@ grace/video/capture/
 grace/video/samples/
 grace/video/GRACE-demo.mp4
 grace/video/timing.json
+grace/PPT.md
+.DS_Store
+grace/video/clear-params.json
