@@ -12,27 +12,26 @@ export const CAPTION_CSS = `
     position: fixed; left: 50%; bottom: 54px; transform: translateX(-50%) translateY(8px);
     z-index: 2147483647;
     max-width: min(1140px, 78vw);
-    padding: 17px 40px;
-    border-radius: 999px;
-    /* Headless Chromium does not composite backdrop-filter into the capture, so
-       the plate is a deliberate ink wash rather than glass: dark enough to hold
-       white text over any part of the page, warm enough to belong to the paper. */
-    background: linear-gradient(180deg, rgba(33,29,24,.90), rgba(24,21,17,.94));
-    box-shadow: 0 2px 10px rgba(0,0,0,.18), 0 22px 54px -20px rgba(40,32,22,.55),
-                inset 0 1px 0 rgba(255,255,255,.12);
-    color: #fdfcfa;
-    font: 500 27px/1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-    letter-spacing: -.008em;
+    padding: 16px 34px;
+    border-radius: 26px;
+    /* Light glass, iOS style: the bubble takes the colour of whatever paper it
+       sits on and lifts it slightly, with a hairline of light around the edge.
+       Captions always land over the paper, so dark ink text stays readable. */
+    background: rgba(255, 253, 248, 0.62);
+    border: 1px solid rgba(60, 49, 33, 0.10);
+    box-shadow: 0 1px 2px rgba(60,49,33,.10), 0 16px 38px -16px rgba(60,49,33,.32),
+                inset 0 1px 0 rgba(255,255,255,.8);
+    color: rgba(24, 20, 15, 0.95);
+    font: 590 26px/1.42 -apple-system, BlinkMacSystemFont, "SF Pro Display", ui-sans-serif, "Segoe UI", sans-serif;
+    letter-spacing: .002em;
     text-align: center;
     text-wrap: balance;
-    text-shadow: 0 1px 2px rgba(0,0,0,.35);
     opacity: 0;
     transition: opacity .28s ease, transform .28s ease;
     pointer-events: none;
   }
   #cap.on { opacity: 1; transform: translateX(-50%) translateY(0); }
-  /* two-line captions get a softer shape than a pure pill */
-  #cap.tall { border-radius: 30px; }
+  #cap.tall { border-radius: 28px; }
 `
 
 /** Injected once; the driver calls window.__cap(text) to change the line. */

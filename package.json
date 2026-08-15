@@ -2,5 +2,8 @@
   "name": "straitsx-agentix",
   "private": true,
   "type": "module",
-  "dependencies": { "viem": "^2.55.16" }
+  "dependencies": {
+    "playwright": "^1.62.1",
+    "viem": "^2.55.16"
+  }
 }
