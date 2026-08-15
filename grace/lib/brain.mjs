@@ -65,7 +65,9 @@ Respond with ONLY a JSON object: {"approve": true/false, "reason": "<one sentenc
       '--messages', `file://${payloadPath}`,
       '--inference-config', '{"maxTokens":200,"temperature":0}',
       '--region', REGION,
-      ...(process.env.AWS_PROFILE ? [] : ['--profile', process.env.BRAIN_PROFILE ?? '688060218394_AdministratorAccess']),
+      // No profile by default: on EC2 the instance role is the credential chain.
+      // Set BRAIN_PROFILE (or AWS_PROFILE) when running from a laptop.
+      ...(process.env.BRAIN_PROFILE ? ['--profile', process.env.BRAIN_PROFILE] : []),
       '--query', 'output.message.content[0].text',
       '--output', 'text',
     ])
