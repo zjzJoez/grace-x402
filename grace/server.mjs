@@ -399,6 +399,14 @@ const server = createServer(async (req, res) => {
       return html(res, phonePage(id, PUBLIC_URL))
     }
     if (req.method === 'GET' && path === '/console') return html(res, consolePage(net))
+    // The stage bookmark: a phone that opens /pay/latest always lands on the
+    // newest still-cancellable order — no typing an order id on stage. Renders
+    // in place (no redirect) so pull-to-refresh re-resolves to the next order.
+    if (req.method === 'GET' && path === '/pay/latest') {
+      const all = [...orders.values()].sort((a, b) => b.createdAt - a.createdAt)
+      const o = all.find((x) => x.status === 'pending') ?? all[0]
+      return o ? html(res, payPage(o, net)) : json(res, 404, { error: 'no orders yet' })
+    }
     const pay = path.match(/^\/pay\/([0-9a-f]+)$/)
     if (req.method === 'GET' && pay) {
       const o = orders.get(pay[1])

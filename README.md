@@ -17,6 +17,40 @@
    against live mainnet state. No keys, no gas, ~20 seconds.
 4. **The receipts** — six mainnet transactions linked below, including one
    settled end-to-end by EventBridge with zero human involvement.
+5. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
+   every frame in it is a real mainnet transaction.
+
+---
+
+## Seen, not told — real frames from the live rail
+
+**The agent buys.** A real x402 purchase; a Claude model on Bedrock approves
+*before any signature exists* — and its reasoning is part of the record:
+
+![The buying agent's terminal — 402 challenge, Bedrock APPROVE, order accepted](grace/shots/terminal.jpg)
+
+**The merchant holds a claim it cannot cash.** Press *SETTLE anyway* during the
+window and the token contract itself answers — no transaction, no gas, just the
+chain's verdict:
+
+![Merchant screen during the cooling-off window — claim held, settlement chain-blocked](grace/shots/merchant-cooling.jpg)
+
+**The payer keeps the last word.** `/pay/latest` on any phone — one tap signs
+`cancelAuthorization`, a relayer pays the gas, and the nonce is burned on-chain
+forever:
+
+<p align="center">
+  <img src="grace/shots/phone-pending.jpg" width="38%" alt="Payer's phone — countdown and CANCEL, costs nothing" />
+  &nbsp;&nbsp;
+  <img src="grace/shots/phone-cancelled.jpg" width="38%" alt="Payer's phone — cancelled, nonce burned on-chain, balance never moved" />
+</p>
+
+**The ledger tells the whole story.** `AuthorizationCanceled` and
+`AuthorizationUsed` side by side — same rail, two human decisions; the balances
+carry a running *unchanged for* timer because "nothing moved" should be
+measured, not asserted:
+
+![On-chain events — Canceled and Used side by side, balances unchanged](grace/shots/events-ledger.jpg)
 
 ---
 
