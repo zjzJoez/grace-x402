@@ -17,7 +17,7 @@ import { writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const MODEL = process.env.BRAIN_MODEL ?? 'anthropic.claude-3-5-sonnet-20240620-v1:0'
+const MODEL = process.env.BRAIN_MODEL ?? 'anthropic.claude-3-haiku-20240307-v1:0'
 const REGION = process.env.BRAIN_REGION ?? 'ap-southeast-1'
 
 const run = (cmd, args) =>
