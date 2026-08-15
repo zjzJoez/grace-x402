@@ -363,4 +363,23 @@ register('editorial-raised', {
 
   @media(max-width:1180px){.split{grid-template-columns:1fr}.rail{grid-template-columns:1fr 1fr}
     .pieces{grid-template-columns:1fr}.brand{font-size:34px}}
+  /* phones: the masthead has to stop being a poster and start being a header */
+  @media(max-width:640px){
+    body{padding:22px 16px 60px}
+    .top{grid-template-columns:1fr;gap:16px;align-items:start}
+    .brand{font-size:27px;line-height:1.15;letter-spacing:-.015em}
+    .sub{font-size:15px}
+    .chain{gap:18px;text-align:left;flex-wrap:wrap}
+    .chain b{font-size:12.5px}
+    .rail{grid-template-columns:1fr;gap:7px}
+    .step{padding:10px 13px;display:flex;align-items:baseline;gap:10px}
+    .step .n{flex-shrink:0} .step .t{margin-top:0}
+    .railnote{text-align:left;font-size:13px}
+    .side{padding:17px 18px}
+    .verdictline{font-size:21px}
+    .quote .said{font-size:15px}
+    .mrow{flex-wrap:wrap;gap:8px 12px}
+    .mrow .nm{width:auto;flex:1} .mrow .bar{order:5;flex-basis:100%}
+    .mrow .dv{width:auto} .mrow .v{width:auto}
+  }
 `)
