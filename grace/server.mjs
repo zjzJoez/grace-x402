@@ -30,6 +30,7 @@ import { orderNonce, fromWire, wireFormat, toAtomic, toSgd, signCancellation } f
 import { publicClientFor, simulateSettle, settle, broadcastCancel, balanceOf } from './lib/settle.mjs'
 import { demoWallets, relayerAccount } from './lib/keys.mjs'
 import { consolePage, payPage, storefrontPage } from './pages.mjs'
+import { missionPage } from './mission.mjs'
 
 const net = pickNetwork()
 const { buyer, merchant } = demoWallets()
@@ -173,6 +174,35 @@ function scheduleAutopilot(record) {
   })
 }
 
+/**
+ * Watch the two wallets so the UI can say, truthfully and continuously, how long
+ * the payer's balance has been untouched. "Nothing moved" is the whole claim, so
+ * it should be measured, not asserted.
+ */
+const balanceWatch = { payer: null, merchant: null, since: Date.now() }
+async function walletState() {
+  const [p, m] = await Promise.all([balanceOf(net, buyer.address, client), balanceOf(net, merchant.address, client)])
+  if (balanceWatch.payer !== p || balanceWatch.merchant !== m) {
+    if (balanceWatch.payer !== null) balanceWatch.since = Date.now()
+    balanceWatch.payer = p
+    balanceWatch.merchant = m
+  }
+  return {
+    payer: buyer.address, merchant: merchant.address,
+    payerXsgd: toSgd(p), merchantXsgd: toSgd(m),
+    unchangedForMs: Date.now() - balanceWatch.since,
+  }
+}
+
+// Block height, polled lazily — proof the chain under the demo is a live mainnet.
+let blockCache = { at: 0, number: null }
+async function blockNumber() {
+  if (Date.now() - blockCache.at > 4000) {
+    blockCache = { at: Date.now(), number: (await client.getBlockNumber().catch(() => null))?.toString() ?? blockCache.number }
+  }
+  return blockCache.number
+}
+
 // ── live chain state per order ───────────────────────────────────────────────
 const simCache = new Map() // id -> { at, result }
 async function liveState(o) {
@@ -283,6 +313,29 @@ const server = createServer(async (req, res) => {
       })
     }
 
+    // Everything the mission-control screen needs, in one round trip.
+    if (req.method === 'GET' && path === '/api/state') {
+      const all = [...orders.values()].sort((a, b) => b.createdAt - a.createdAt)
+      const [wallets, block, views] = await Promise.all([
+        walletState(), blockNumber(), Promise.all(all.slice(0, 6).map(orderView)),
+      ])
+      const events = []
+      for (const o of all) {
+        if (o.txs.cancel) events.push({ kind: 'AuthorizationCanceled', at: o.opensAt, order: o.id, amountSgd: o.amountSgd, nonce: o.authorization.nonce, tx: o.txs.cancel })
+        if (o.txs.settle) events.push({ kind: 'AuthorizationUsed', at: o.opensAt, order: o.id, amountSgd: o.amountSgd, nonce: o.authorization.nonce, tx: o.txs.settle })
+      }
+      return json(res, 200, {
+        chain: { label: net.label, chainId: net.chain.id, token: net.token, explorer: net.explorer, block },
+        wallets,
+        // The newest order, whatever its state — the screen should keep showing
+        // the outcome after it settles or is vetoed, not fall back to an older one.
+        active: views[0] ?? null,
+        orders: views,
+        events: events.slice(0, 6),
+        now: Math.floor(Date.now() / 1000),
+      })
+    }
+
     const m = path.match(/^\/api\/orders\/([0-9a-f]+)\/(settle|cancel)$/)
     if (req.method === 'POST' && m) {
       const o = orders.get(m[1])
@@ -302,13 +355,14 @@ const server = createServer(async (req, res) => {
       return o ? json(res, 200, await orderView(o)) : json(res, 404, { error: 'no such order' })
     }
 
+    if (req.method === 'GET' && (path === '/' || path === '/live')) return html(res, missionPage(net))
     if (req.method === 'GET' && path === '/console') return html(res, consolePage(net))
     const pay = path.match(/^\/pay\/([0-9a-f]+)$/)
     if (req.method === 'GET' && pay) {
       const o = orders.get(pay[1])
       return o ? html(res, payPage(o, net)) : json(res, 404, { error: 'no such order' })
     }
-    if (req.method === 'GET' && (path === '/' || path === '/store')) return html(res, storefrontPage(CATALOG, net, merchant.address))
+    if (req.method === 'GET' && path === '/store') return html(res, storefrontPage(CATALOG, net, merchant.address))
 
     json(res, 404, { error: 'not found' })
   } catch (err) {
