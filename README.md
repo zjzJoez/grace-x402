@@ -81,6 +81,28 @@ Plus `prove.mjs`: 13 adversarial checks (payee binding, forged-cancel rejection,
 burned-nonce replay, order-hash commitment …) — all passing against live mainnet
 state, no contract deployed, no gas spent.
 
+## Deployed on AWS, not drawn on a slide
+
+Merchant service on **EC2** (ap-southeast-1) at <http://13.212.242.21>.
+
+**GRACE Autopilot** — on every accepted order the merchant creates a one-shot
+**EventBridge Scheduler** schedule at `validAfter`, which wakes a **Lambda** that
+rings the merchant's settle endpoint. The Lambda holds **zero keys**; the chain
+stays the only authority. The merchant never presses a button — humans only ever
+say no. Measured end to end: window opened 09:05:31Z, final on-chain 09:06:13Z.
+
+If the payer vetoed during the window, the schedule still fires and settlement
+reverts with `authorization is used or canceled`. In the Lambda log that is not
+an error, it is the product working.
+
+**Bedrock** hosts the buying agent's purchase-decision brain, consulted before any
+signature exists — it approves in-budget carts and refuses over-budget ones
+outright. That is advisory, not the guarantee: the guarantee is the cooling-off
+window, because GRACE assumes agents will sometimes be wrong.
+
+Architecture diagram: [`grace/architecture.drawio`](grace/architecture.drawio)
+· [open in viewer](https://viewer.diagrams.net/?lightbox=1&url=https%3A%2F%2Fraw.githubusercontent.com%2FzjzJoez%2Fgrace-x402%2Fmain%2Fgrace%2Farchitecture.drawio)
+
 ## Honest edges
 
 - **GRACE guarantees intent-finality, not solvency.** The payer could drain the
@@ -91,24 +113,38 @@ state, no contract deployed, no gas spent.
   and revert). A facilitator adopts the scheme by adding one rule: settle at
   `validAfter`, not on receipt.
 
-## Run it
+## See it
+
+**<http://13.212.242.21>** — one live screen. The countdown sits between the two
+parties on purpose: the same number means *"you cannot cash this"* to the merchant
+and *"you can still kill this"* to the payer. Below it, both balances carry a
+running "unchanged for" timer, because *nothing moved* is the claim and it should
+be measured rather than asserted.
+
+## Run it yourself
 
 ```bash
 npm i                                   # viem only
-node grace/prove.mjs                    # 13 mainnet proofs, zero gas, no keys needed
-node grace/server.mjs                   # merchant  → http://localhost:4021/console
-node grace/agent.mjs --sku tee-agentix  # buyer agent → prints the human confirm URL
+node grace/prove.mjs                    # 13 mainnet proofs — no keys, no gas, ~20s
+node grace/server.mjs                   # merchant → http://localhost:4021
+node grace/agent.mjs --sku tee-agentix --server http://localhost:4021 [--brain]
 ```
+
+`prove.mjs` is the one to run if you only run one: it asserts every claim in this
+README against live Avalanche mainnet state, from a throwaway key, spending nothing.
 
 ```
 grace/
 ├── lib/xsgd.mjs           chain constants, ABI, revert strings (all live-verified)
 ├── lib/authorization.mjs  deferred-payment + cancellation signing, order-hash nonce
 ├── lib/settle.mjs         settle / cancel / simulate, revert classification
-├── server.mjs             merchant: x402 exact-deferred endpoint + order book
+├── lib/brain.mjs          Bedrock purchase decision, taken before any signature exists
+├── server.mjs             merchant: x402 exact-deferred endpoint + order book + autopilot
+├── mission.mjs            the live screen
+├── themes.mjs             visual themes; ?theme=<key>, ?picker=1 to compare
 ├── agent.mjs              buyer agent CLI
-├── pages.mjs              merchant console · buyer phone page · storefront
-└── prove.mjs              adversarial proof suite against live mainnet
+├── prove.mjs              adversarial proof suite against live mainnet
+└── architecture.drawio    functional blocks, AWS deployment, data flow
 ```
 
 *One line we want to leave behind:*
