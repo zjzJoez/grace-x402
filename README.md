@@ -147,7 +147,9 @@ signature exists — it approves in-budget carts and refuses over-budget ones
 outright. That is advisory, not the guarantee: the guarantee is the cooling-off
 window, because GRACE assumes agents will sometimes be wrong.
 
-Architecture diagram: [`grace/architecture.drawio`](grace/architecture.drawio)
+![Architecture — buyer side, merchant on AWS, and the chain as the only authority, with the cooling-off timeline](grace/shots/architecture.jpg)
+
+Source: [`grace/architecture.drawio`](grace/architecture.drawio)
 · [open in viewer](https://viewer.diagrams.net/?lightbox=1&url=https%3A%2F%2Fraw.githubusercontent.com%2FzjzJoez%2Fgrace-x402%2Fmain%2Fgrace%2Farchitecture.drawio)
 
 ## Honest edges
