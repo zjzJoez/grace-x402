@@ -20,9 +20,9 @@ import { join } from 'node:path'
 const MODEL = process.env.BRAIN_MODEL ?? 'anthropic.claude-3-5-sonnet-20240620-v1:0'
 const REGION = process.env.BRAIN_REGION ?? 'ap-southeast-1'
 
-const run = (args) =>
+const run = (cmd, args) =>
   new Promise((resolve, reject) => {
-    execFile('aws', args, { timeout: 45000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) =>
+    execFile(cmd, args, { timeout: 60000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) =>
       err ? reject(new Error(stderr || err.message)) : resolve(stdout)
     )
   })
@@ -47,11 +47,19 @@ Rules: reject if the price is unreasonable for the item, exceeds the wallet, or 
 
 Respond with ONLY a JSON object: {"approve": true/false, "reason": "<one sentence>"}`
 
+  const parse = (out, model) => {
+    const m = out.match(/\{[\s\S]*\}/)
+    if (!m) throw new Error(`unparseable brain output: ${out.slice(0, 120)}`)
+    const d = JSON.parse(m[0])
+    return { approve: !!d.approve, reason: String(d.reason ?? ''), model }
+  }
+
+  // Primary: Claude on Amazon Bedrock.
   const messages = JSON.stringify([{ role: 'user', content: [{ text: prompt }] }])
   const payloadPath = join(tmpdir(), `grace-brain-${process.pid}.json`)
   writeFileSync(payloadPath, messages)
   try {
-    const out = await run([
+    const out = await run('aws', [
       'bedrock-runtime', 'converse',
       '--model-id', MODEL,
       '--messages', `file://${payloadPath}`,
@@ -61,10 +69,17 @@ Respond with ONLY a JSON object: {"approve": true/false, "reason": "<one sentenc
       '--query', 'output.message.content[0].text',
       '--output', 'text',
     ])
-    const m = out.match(/\{[\s\S]*\}/)
-    if (!m) throw new Error(`unparseable brain output: ${out.slice(0, 120)}`)
-    const d = JSON.parse(m[0])
-    return { approve: !!d.approve, reason: String(d.reason ?? ''), model: MODEL }
+    return parse(out, `bedrock:${MODEL}`)
+  } catch (bedrockErr) {
+    // Fallback: local Claude CLI. The brain is model-agnostic by design — on
+    // accounts where the org SCP blocks Bedrock marketplace subscriptions
+    // (like this hackathon org), the same decision runs anywhere Claude does.
+    try {
+      const out = await run('claude', ['-p', prompt, '--output-format', 'text', '--model', 'haiku'])
+      return parse(out, 'local:claude-haiku')
+    } catch {
+      throw bedrockErr // report the primary failure, it is the actionable one
+    }
   } finally {
     rmSync(payloadPath, { force: true })
   }
