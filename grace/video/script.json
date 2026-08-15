@@ -1,0 +1,77 @@
+{
+  "_comment": "Plain-spoken narration. The screen carries the technical detail — the revert string, the contract address, the rail — so the voice does not have to. `lines` are the on-screen captions, shown in order across the beat, split proportionally by length.",
+  "voice": {
+    "id": "rOVKXrU0YcQMzmTNwaDq",
+    "name": "Louis — crisp, Singaporean",
+    "settings": { "stability": 0.42, "similarity_boost": 0.8, "style": 0.28, "speed": 1.0 }
+  },
+  "beats": [
+    {
+      "id": "problem",
+      "cue": "idle screen",
+      "text": "Your AI assistant just bought something for you. Did you actually want it? The shop can't tell either. And there is no rule anywhere for \"my assistant did it\" — so most shops would rather not take that order at all.",
+      "lines": [
+        "Your AI assistant just bought something for you.",
+        "Did you actually want it? The shop can't tell either.",
+        "There's no rule anywhere for \"my assistant did it\" —",
+        "so most shops would rather not take the order at all."
+      ]
+    },
+    {
+      "id": "mechanism",
+      "cue": "agent buys; order appears; countdown starts",
+      "text": "GRACE gives every one of those payments a ninety second pause. The shop gets a signed promise right away. It just can't collect on it yet.",
+      "lines": [
+        "GRACE gives every one of those payments a ninety second pause.",
+        "The shop gets a signed promise right away.",
+        "It just can't collect on it yet."
+      ]
+    },
+    {
+      "id": "settle",
+      "cue": "press SETTLE",
+      "text": "Here is the shop trying to collect early.",
+      "lines": ["Here's the shop trying to collect early."]
+    },
+    {
+      "id": "verdict",
+      "cue": "hold on the revert string",
+      "text": "Not yet valid. That is not our server saying no. That is the money itself refusing.",
+      "lines": [
+        "\"Not yet valid.\"",
+        "That's not our server saying no.",
+        "That's the money itself refusing."
+      ]
+    },
+    {
+      "id": "cancel",
+      "cue": "press CANCEL; ring turns red",
+      "text": "And during that pause, you can kill it. One tap. That just happened for real, on a live blockchain, with real Singapore dollars.",
+      "lines": [
+        "And during that pause, you can kill it. One tap.",
+        "That just happened for real, on a live blockchain,",
+        "with real Singapore dollars."
+      ]
+    },
+    {
+      "id": "money",
+      "cue": "the balances, deltas at zero",
+      "text": "Now look at the balance. It never moved. There is nothing to refund, because the money never left your wallet.",
+      "lines": [
+        "Now look at the balance. It never moved.",
+        "There's nothing to refund —",
+        "the money never left your wallet."
+      ]
+    },
+    {
+      "id": "close",
+      "cue": "footer strip, then back to top",
+      "text": "Say nothing, and it goes through on its own, and it is final. Nobody ever held your money. Nobody had to.",
+      "lines": [
+        "Say nothing, and it goes through on its own. And it's final.",
+        "Nobody ever held your money.",
+        "Nobody had to."
+      ]
+    }
+  ]
+}

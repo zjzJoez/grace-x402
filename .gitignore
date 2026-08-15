@@ -12,3 +12,8 @@ txtime-temp.mjs
 grace/SUBMISSION.md
 grace/evidence/
 grace/VIDEO.md
+grace/video/audio/
+grace/video/capture/
+grace/video/samples/
+grace/video/GRACE-demo.mp4
+grace/video/timing.json
