@@ -355,7 +355,13 @@ const server = createServer(async (req, res) => {
       return o ? json(res, 200, await orderView(o)) : json(res, 404, { error: 'no such order' })
     }
 
-    if (req.method === 'GET' && (path === '/' || path === '/live')) return html(res, missionPage(net))
+    if (req.method === 'GET' && (path === '/' || path === '/live')) {
+      return html(res, missionPage(
+        net,
+        url.searchParams.get('theme') ?? process.env.GRACE_THEME ?? 'editorial',
+        url.searchParams.has('picker'),
+      ))
+    }
     if (req.method === 'GET' && path === '/console') return html(res, consolePage(net))
     const pay = path.match(/^\/pay\/([0-9a-f]+)$/)
     if (req.method === 'GET' && pay) {
