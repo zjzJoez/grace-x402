@@ -59,18 +59,26 @@ async function caps() {
 const cap = (t) => page.evaluate((x) => window.__cap && window.__cap(x), t).catch(() => {})
 
 /** speak a beat's captions across its measured duration; action runs alongside */
-async function runBeat(id, action) {
+async function runBeat(id, action, onLine) {
   const b = beat(id)
   const src = script.beats.find((x) => x.id === id)
   process.stdout.write(`  ${id.padEnd(10)} ${b.seconds.toFixed(2)}s `)
   const acting = action ? action() : Promise.resolve()
+  let i = 0
   for (const line of planLines(src, b.seconds)) {
+    if (onLine) await onLine(i)
     await cap(line.text)
     await wait(line.seconds - 0.18)
+    i++
   }
   await acting
   console.log('ok')
 }
+
+// ── scene 0 · the problem, in three cards ────────────────────────────────────
+await page.goto(`${SERVER}/stage/problem`)
+await caps()
+await runBeat('hook', null, (i) => page.evaluate((n) => window.__reveal(n), i).catch(() => {}))
 
 // ── scene 1 · the agent's terminal ───────────────────────────────────────────
 await page.goto(`${SERVER}/stage/terminal`)

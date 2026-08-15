@@ -138,3 +138,23 @@ export function endPage() {
   </div>
 </body></html>`
 }
+
+export function problemPage() {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>GRACE</title>
+<style>
+  ${BASE}
+  .cards{display:flex;flex-direction:column;gap:26px;max-width:900px;text-align:center}
+  .pc{font:600 44px/1.2 "New York",ui-serif,Georgia,serif;letter-spacing:-.022em;
+    opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+  .pc.on{opacity:1;transform:none}
+  .pc i{font-style:italic;color:#a94b2a}
+  .pc.small{font-size:30px;color:#6b6459}
+</style></head><body>
+  <div class="cards">
+    <div class="pc" id="c0">An AI agent just spent <i>your</i> money.</div>
+    <div class="pc small" id="c1">No dispute code exists for <i>“my agent did it.”</i></div>
+    <div class="pc small" id="c2">So merchants refuse AI customers.</div>
+  </div>
+<script>window.__reveal=(i)=>document.getElementById('c'+i).classList.add('on')</script>
+</body></html>`
+}

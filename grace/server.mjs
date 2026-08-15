@@ -31,7 +31,8 @@ import { publicClientFor, simulateSettle, settle, broadcastCancel, balanceOf } f
 import { demoWallets, relayerAccount } from './lib/keys.mjs'
 import { consolePage, payPage, storefrontPage } from './pages.mjs'
 import { missionPage } from './mission.mjs'
-import { terminalPage, phonePage, endPage } from './stage.mjs'
+import { terminalPage, phonePage, endPage, problemPage } from './stage.mjs'
+import { whyPage } from './why.mjs'
 
 const net = pickNetwork()
 const { buyer, merchant } = demoWallets()
@@ -388,6 +389,8 @@ const server = createServer(async (req, res) => {
         url.searchParams.has('picker'),
       ))
     }
+    if (req.method === 'GET' && path === '/why') return html(res, whyPage(net))
+    if (req.method === 'GET' && path === '/stage/problem') return html(res, problemPage())
     if (req.method === 'GET' && path === '/stage/terminal') return html(res, terminalPage())
     if (req.method === 'GET' && path === '/stage/end') return html(res, endPage())
     if (req.method === 'GET' && path === '/phone') {

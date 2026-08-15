@@ -26,7 +26,7 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       <div>
         <div class="brand">The claim moves now. <b>The money moves only after the veto window.</b></div>
         <div class="tag">GRACE · a cooling-off rail for agentic payments · x402 scheme <code>exact-deferred</code></div>
-        <div class="sub">No dispute code exists for <i>“my agent did it.”</i> So every payment settled here is one a human chose not to veto.</div>
+        <div class="sub">No dispute code exists for <i>“my agent did it.”</i> So every payment settled here is one a human chose not to veto. <a class="whylink" href="/why">the full story →</a></div>
       </div>
       <div class="chain">
         <div><span class="live">network</span><b>${net.label}</b></div>

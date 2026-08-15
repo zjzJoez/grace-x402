@@ -174,6 +174,7 @@ register('editorial-tight', {
   note: 'the chosen editorial look with the page reduced to four bands: masthead, rail, the split, the proofs.',
   arc: { cooling: '#b76523', void: '#a12b2b', settled: '#39725a', lapsed: '#8c877d' },
 }, THEMES.editorial.css + `
+  .whylink{font-style:normal;font-weight:600;color:#345c7e;text-decoration:none;border-bottom:1px solid rgba(52,92,126,.35)}
   .phlink{margin-top:10px;text-align:center;font-size:13px}
   .phlink a{color:#345c7e}
   .sub{margin-top:9px;max-width:760px;color:#5f594f;font:italic 15px/1.5 Georgia,"Times New Roman",serif}
@@ -247,6 +248,7 @@ register('editorial-raised', {
   .tag{margin-top:13px;color:var(--muted);font:600 11px/1.4 var(--sans);
     letter-spacing:.13em;text-transform:uppercase}
   .tag code{font:11px var(--mono);text-transform:none;letter-spacing:0;color:var(--ink)}
+  .whylink{font-style:normal;font-weight:600;color:#345c7e;text-decoration:none;border-bottom:1px solid rgba(52,92,126,.35)}
   .phlink{margin-top:10px;text-align:center;font-size:13px}
   .phlink a{color:#345c7e}
   .sub{margin-top:10px;max-width:790px;color:#575046;font:italic 17px/1.5 var(--serif)}

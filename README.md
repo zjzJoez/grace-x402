@@ -2,8 +2,21 @@
 
 **Track 3 · AI-native Commerce · StraitsX AgentiX Playground 2026**
 
-> Merchants can't price the risk of an AI customer. GRACE makes that risk zero —
-> with one field of EIP-3009 that everyone else hardcodes to zero.
+> **Everyone else makes agents pay. GRACE makes merchants able to accept.**
+> Dispute protection built from one field of EIP-3009 that everyone else
+> hardcodes to zero — no escrow, no custodian, no new contract.
+
+## For judges — the 90-second tour
+
+1. **The story** — <http://13.212.242.21/why> · the deadlock, the one-field
+   insight, and what each sponsor's piece does. Two-minute read.
+2. **The live rail** — <http://13.212.242.21> · a real order book on Avalanche
+   mainnet. Press *SETTLE anyway* during a window and read the token contract's
+   own refusal; open *the payer's phone* and cancel for real.
+3. **The proof** — `npm i && node grace/prove.mjs` · 13 adversarial checks
+   against live mainnet state. No keys, no gas, ~20 seconds.
+4. **The receipts** — six mainnet transactions linked below, including one
+   settled end-to-end by EventBridge with zero human involvement.
 
 ---
 

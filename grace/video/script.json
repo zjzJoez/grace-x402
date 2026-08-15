@@ -3,76 +3,90 @@
   "voice": {
     "id": "rOVKXrU0YcQMzmTNwaDq",
     "name": "Louis — crisp, Singaporean",
-    "settings": { "stability": 0.42, "similarity_boost": 0.8, "style": 0.28, "speed": 1.0 }
+    "settings": {
+      "stability": 0.42,
+      "similarity_boost": 0.8,
+      "style": 0.28,
+      "speed": 1.04
+    }
   },
   "beats": [
     {
-      "id": "terminal",
-      "cue": "/stage/terminal — command types itself, real agent output streams in, APPROVE highlighted",
-      "text": "This is a shopping agent buying a T-shirt. Its AI brain checks the deal, approves it, and pays. Real Singapore dollars, live on Avalanche. Now watch what makes this payment different.",
+      "id": "hook",
+      "cue": "/stage/problem — three cards reveal in sequence",
+      "text": "An AI agent just spent your money — did you want it to? The shop can't tell. No dispute code exists for \"my agent did it\", so merchants simply refuse AI customers.",
       "lines": [
-        "This is a shopping agent, buying a T-shirt.",
-        "Its AI brain checks the deal, approves it — and pays.",
-        "Real Singapore dollars, live on Avalanche.",
-        "Now watch what makes this payment different."
+        "An AI agent just spent your money. Did you actually want it to?",
+        "The shop can't tell — and no dispute code exists for \"my agent did it.\"",
+        "So merchants simply refuse AI customers."
+      ]
+    },
+    {
+      "id": "terminal",
+      "cue": "terminal — real agent output, APPROVE highlighted",
+      "text": "So we built the fix. Watch a real purchase: the agent's AI brain approves the deal, and pays. Real Singapore dollars, live on Avalanche.",
+      "lines": [
+        "So we built the fix. Watch a real purchase:",
+        "the agent's AI brain approves the deal — and pays.",
+        "Real Singapore dollars, live on Avalanche."
       ]
     },
     {
       "id": "cooling",
-      "cue": "cut to merchant screen — order card + countdown ring",
-      "text": "This is the shop's screen. The payment has already arrived, signed and locked. But it comes with a built-in pause: for ninety seconds, the shop cannot collect it.",
+      "cue": "merchant screen — countdown ring",
+      "text": "The payment lands with a built-in pause: the shop holds it, signed and locked, but can't collect for ninety seconds. Nobody's waiting — only the money is.",
       "lines": [
-        "This is the shop's screen. The payment has arrived — signed and locked.",
-        "But it comes with a built-in pause:",
-        "for ninety seconds, the shop cannot collect it."
+        "The payment lands with a built-in pause.",
+        "The shop holds it — signed and locked — but can't collect for 90 seconds.",
+        "Nobody is waiting. Only the money is."
       ]
     },
     {
       "id": "refuse",
-      "cue": "click SETTLE anyway — dark slab fills with the revert",
-      "text": "Let the shop try anyway. The money itself refuses. That answer came from the token contract on the blockchain — not from any server of ours.",
+      "cue": "SETTLE anyway — revert slab",
+      "text": "Let the shop try early. The money itself refuses. That answer came from the token contract, not from any server of ours.",
       "lines": [
-        "Let the shop try anyway —",
+        "Let the shop try early —",
         "the money itself refuses.",
-        "That answer came from the token contract. Not from us."
+        "That's the token contract talking. Not our server."
       ]
     },
     {
       "id": "phone",
-      "cue": "cut to the phone — countdown + red button, then the tap, then CANCELLED",
-      "text": "Meanwhile, this is your phone. Changed your mind? One tap. That cancellation just went on-chain, permanently. The shop can never collect that payment.",
+      "cue": "phone frame — tap CANCEL",
+      "text": "And you keep the last word. Changed your mind? One tap. That cancellation just went on-chain, permanently.",
       "lines": [
-        "Meanwhile — this is your phone.",
+        "And you keep the last word.",
         "Changed your mind? One tap.",
         "That cancellation just went on-chain. Permanently."
       ]
     },
     {
       "id": "money",
-      "cue": "back to the merchant screen — balance bars, deltas at zero",
-      "text": "And here is the part that matters: your balance never moved. There is nothing to refund, because the money never left your wallet.",
+      "cue": "balances, deltas zero",
+      "text": "Your balance never moved. Nothing to refund, because nothing ever left.",
       "lines": [
-        "And here's the part that matters:",
-        "your balance never moved.",
-        "Nothing to refund — the money never left your wallet."
+        "Your balance never moved.",
+        "Nothing to refund — because nothing ever left."
       ]
     },
     {
       "id": "autopilot",
-      "cue": "scroll to on-chain events — AuthorizationUsed (auto-settled earlier order) glows next to AuthorizationCanceled",
-      "text": "And when you don't object? Amazon's scheduler settles it for you, right on time, and it is final. There is the earlier order — settled on its own, no chargebacks, ever.",
+      "cue": "events — Canceled and Used side by side",
+      "text": "Say nothing, and Amazon's scheduler settles it on time — final, no chargebacks. There's the earlier order, settled on its own.",
       "lines": [
-        "And when you don't object?",
-        "Amazon's scheduler settles it for you, right on time. Final.",
-        "There's the earlier order — settled on its own. No chargebacks, ever."
+        "Say nothing — Amazon's scheduler settles it on time. Final. No chargebacks.",
+        "There's the earlier order, settled on its own."
       ]
     },
     {
       "id": "close",
-      "cue": "/stage/end — the card",
-      "text": "GRACE. Nobody ever held your money. Nobody had to.",
+      "cue": "end card",
+      "text": "Everyone else makes agents pay. GRACE makes merchants able to accept. Nobody ever held your money. Nobody had to.",
       "lines": [
-        "GRACE. Nobody ever held your money. Nobody had to."
+        "Everyone else makes agents pay.",
+        "GRACE makes merchants able to accept.",
+        "Nobody ever held your money. Nobody had to."
       ]
     }
   ]
