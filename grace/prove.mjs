@@ -125,9 +125,21 @@ for (const span of [2000n, 20000n, 100000n]) {
   if (logs.length) { used = logs[logs.length - 1]; break }
 }
 
+// A spent nonce is spent forever, so an old one proves the point as well as a
+// fresh one — fall back to a settlement this rail actually performed
+// (tx 0x2addd508…, block 92858267) so the suite runs the same 13 checks on any
+// day, however quiet the recent log window happens to be.
 if (!used) {
-  console.log(D('  SKIP  no AuthorizationUsed event found in recent history'))
-} else {
+  used = {
+    blockNumber: 92858267n,
+    args: {
+      authorizer: '0x855A4b2085B16065204c379439773a4F9Ef7F424',
+      nonce: '0xbc42530aa36162255bc91b9e4ba463531e3f2a006c1a1ff9860b81695b2afbde',
+    },
+  }
+}
+
+{
   const { authorizer, nonce } = used.args
   check((await authorizationState(net, authorizer, nonce, client)) === true,
     'a nonce from a real AuthorizationUsed event reads spent', `block ${used.blockNumber}`)
