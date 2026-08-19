@@ -26,7 +26,7 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       <div>
         <div class="brand">The claim moves now. <b>The money moves only after the veto window.</b></div>
         <div class="tag">GRACE · a cooling-off rail for agentic payments · x402 scheme <code>exact-deferred</code></div>
-        <div class="sub">No dispute code exists for <i>“my agent did it.”</i> So every payment settled here is one a human chose not to veto. <a class="whylink" href="/why">the full story →</a></div>
+        <div class="sub">No dispute code exists for <i>“my agent did it.”</i> This demo shows a separately controlled payer wallet cancel before settlement. <a class="whylink" href="/why">scope and limits →</a></div>
       </div>
       <div class="chain">
         <div><span class="live">network</span><b>${net.label}</b></div>
@@ -88,7 +88,7 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
 
     <div class="pieces">
       <div class="piece"><div class="k kX">XSGD</div><div class="d">the rule lives in the token — <b>no contract deployed</b>, one field changed: <code>validAfter</code></div></div>
-      <div class="piece"><div class="k kA">Avalanche</div><div class="d">~2s finality is what makes a 90s window safe — the veto lands long before the edge</div></div>
+      <div class="piece"><div class="k kA">Avalanche</div><div class="d">fast finality permits a practical safety margin — near-edge cancellation can still race settlement</div></div>
       <div class="piece"><div class="k kW">AWS</div><div class="d">one-shot EventBridge schedule → Lambda → settle; the Lambda holds <b>zero keys</b></div></div>
     </div>
   </div>`
@@ -179,9 +179,9 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       $('arc').setAttribute('stroke',ARC.cooling);
       $('arc').style.strokeDashoffset=CIRC*(1-left/total);
       $('mVerdict').innerHTML='<span class="cant">cannot cash it — '+left+'s to go</span>';
-      $('pVerdict').innerHTML='<span class="can">can void it, unilaterally</span>';
+      $('pVerdict').innerHTML='<span class="can">payer authority can void it</span>';
       $('mBtn').innerHTML='<button class="bSettle blocked" onclick="act(\\''+o.id+'\\',\\'settle\\',this)">SETTLE anyway →</button>';
-      $('pBtn').innerHTML='<button class="bCancel" onclick="act(\\''+o.id+'\\',\\'cancel\\',this)">CANCEL AUTHORIZATION · payer pays 0 gas</button>'+
+      $('pBtn').innerHTML='<button class="bCancel" onclick="act(\\''+o.id+'\\',\\'cancel\\',this)">CANCEL AUTHORIZATION · demo relay broadcasts</button>'+
         '<div class="phlink"><a href="/phone?id='+o.id+'">open this on the payer\\'s phone →</a></div>';
       $('mQuote').style.display='block'; $('mQuote').className='quote';
       $('mSaid').textContent='"'+(o.live.reason||'…')+'"';
@@ -200,10 +200,10 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       $('ringNum').textContent='✓'; $('ringLbl').textContent='final';
       $('arc').setAttribute('stroke',ARC.settled); $('arc').style.strokeDashoffset=0;
       $('mVerdict').innerHTML='<span class="can">settled · final, no chargeback exists</span>';
-      $('pVerdict').innerHTML='<span class="wait">window passed without objection</span>';
+      $('pVerdict').innerHTML='<span class="wait">no cancellation landed first</span>';
       $('mBtn').innerHTML=''; $('pBtn').innerHTML='';
       $('mQuote').style.display='none';
-      $('ringCap').innerHTML='the human did not object<br><b>so the money moved — once, finally</b>';
+      $('ringCap').innerHTML='no cancellation landed first<br><b>so the money moved — once, finally</b>';
     } else if(st==='expired'){
       $('ringNum').textContent='—'; $('ringLbl').textContent='lapsed';
       $('arc').setAttribute('stroke',ARC.lapsed); $('arc').style.strokeDashoffset=0;

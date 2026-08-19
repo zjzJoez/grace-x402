@@ -38,7 +38,7 @@ USER INSTRUCTION: ${instruction}
 MERCHANT OFFER (x402 challenge):
 - item: ${challenge.extra?.description ?? challenge.extra?.sku}
 - price: ${Number(challenge.amount) / 1e6} XSGD (Singapore dollar stablecoin)
-- cooling-off period: ${challenge.extra?.coolingOffSeconds}s (after you pay, the human can unilaterally cancel on-chain during this window; the merchant cannot settle until it closes)
+- cooling-off period: ${challenge.extra?.coolingOffSeconds}s (the payer authority can cancel on-chain; an independent human veto requires wallet authority separate from the agent; the merchant cannot settle before activation)
 - network: ${challenge.network}
 
 WALLET: ${walletXsgd} XSGD available.

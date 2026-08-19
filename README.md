@@ -3,7 +3,7 @@
 **Track 3 · AI-native Commerce · StraitsX AgentiX Playground 2026**
 
 > **Everyone else makes agents pay. GRACE makes merchants able to accept.**
-> Dispute protection built from one field of EIP-3009 that everyone else
+> A pre-settlement intent check built from one field of EIP-3009 that everyone else
 > hardcodes to zero — no escrow, no custodian, no new contract.
 
 ## For judges — the 90-second tour
@@ -35,9 +35,9 @@ chain's verdict:
 
 ![Merchant screen during the cooling-off window — claim held, settlement chain-blocked](grace/shots/merchant-cooling.jpg)
 
-**The payer keeps the last word.** `/pay/latest` on any phone — one tap signs
-`cancelAuthorization`, a relayer pays the gas, and the nonce is burned on-chain
-forever:
+**The payer keeps the last word in this demo.** `/pay/latest` on the separately
+controlled payer wallet signs `cancelAuthorization`; the configured demo relayer pays
+the gas, and the nonce is burned on-chain forever:
 
 <p align="center">
   <img src="grace/shots/phone-pending.jpg" width="38%" alt="Payer's phone — countdown and CANCEL, costs nothing" />
@@ -56,9 +56,10 @@ measured, not asserted:
 
 ## The problem no chargeback code covers
 
-An AI agent places an order. The merchant cannot tell whether the human behind it
-actually wanted this — a misread instruction, a prompt injection, a triple-fired
-checkout all look identical to a legitimate purchase. In card land, disputes have
+An AI agent places an order. The merchant cannot tell whether the principal behind it
+actually wanted this — a misread instruction and a triple-fired checkout look identical
+to a legitimate purchase. Prompt-injection protection additionally requires a payer
+signer or recovery authority that the agent does not exclusively control. In card land, disputes have
 no reason code for *"my agent did it"*. On-chain, settlement is instant and final,
 so the buyer's protection is zero. Result: rational merchants must reject or
 surcharge agent traffic, and rational humans won't hand real money to agents.
@@ -91,8 +92,9 @@ Neither party can do the other's job. No third party can do either. **No escrow,
 no custodian, no new contract** — the money never leaves the payer's wallet, so
 "reversal" costs nothing: nothing moved.
 
-Cancellation being a meta-transaction matters: a phone holding **zero AVAX** can
-still kill a payment. Signed by the payer, broadcast by anyone.
+Cancellation being a meta-transaction matters: it is **relayable**. A phone holding zero
+AVAX can cancel only when a funded relayer is available and lands the payer-signed
+transaction; direct self-broadcast remains the fallback.
 
 ## The protocol: `exact-deferred`, an x402 scheme extension
 
@@ -110,7 +112,8 @@ The 402 challenge gains two fields, everything else is stock x402:
 - The window is **declared by the merchant per SKU**: physical goods that ship in
   days cost nothing to protect for 90 seconds; instant digital goods set 0.
   Cooling-off becomes a trust signal merchants compete on, like "free returns".
-- Works unchanged on **any** EIP-3009 token — USDC included.
+- Works only on a deployed EIP-3009 implementation whose cancellation, timing, event,
+  and (for smart wallets) ERC-1271 capabilities have been probed or allowlisted.
 
 ## Proven on mainnet, with real money
 
@@ -127,6 +130,12 @@ Full loop executed on Avalanche C-Chain (43114) against live XSGD:
 Plus `prove.mjs`: 13 adversarial checks (payee binding, forged-cancel rejection,
 burned-nonce replay, order-hash commitment …) — all passing against live mainnet
 state, no contract deployed, no gas spent.
+
+These checks prove token mechanics, not a production asynchronous protocol. The
+production proposal requires a durable coordinator, HTTP 202/status/cancel semantics,
+restart recovery, an independent-authority profile for human-over-agent claims, a named
+relayer, and a `cancelBy` safety margin. The EventBridge hack demo below predates those
+requirements and is not presented as a conforming coordinator.
 
 ## Deployed on AWS, not drawn on a slide
 

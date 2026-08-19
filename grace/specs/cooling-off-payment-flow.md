@@ -1,163 +1,321 @@
 # Payment Flow: `cooling-off`
 
-> Proposed addition to `x402-specification-v2.md` §6.1 (Asset Transfer Methods and
-> Payment Flow Models). Network binding for `exact` / `eip3009`:
+> Proposed addition to `x402-specification-v2.md` §6.1. The EVM binding is
 > [`cooling-off-flow-exact-eip3009.md`](cooling-off-flow-exact-eip3009.md).
 
 ## Summary
 
-`cooling-off` is a payment flow in which settlement is deliberately delayed by a
-**client-cancellable window**. The client's authorization is signed and delivered
-normally, but it does not become settleable until a declared moment; until then the
-underlying ledger primitive refuses settlement, and the client MAY withdraw the payment
-unilaterally.
+`cooling-off` is a durably deferred payment flow with a bounded pre-settlement
+cancellation period:
 
-| Flow | Ordering |
-| :-- | :-- |
-| `cooling-off` | verify → resource → respond → *(cancellable window)* → settle |
+```text
+verify → persist contingent commitment → respond pending → settle → fulfil
+```
 
-The flow differs from `authorization` in one respect: the response to the client is
-returned **before** settlement rather than after, because settlement is scheduled for a
-future instant rather than attempted immediately. It satisfies §6.1's invariant — a
-read-only `/verify` runs before the resource executes.
+The response before settlement is a **contingent commitment record**, not the paid
+deliverable and not proof of payment. The underlying obligation MUST NOT begin until
+settlement succeeds with the finality required by the network binding.
 
-Nothing is escrowed and no custodian holds funds during the window. Where the network
-binding supports it (EIP-3009 does), the window is enforced by the token contract itself
-and withdrawal is a signature the client can have relayed at no gas cost.
-
-## Motivation
-
-x402 today has two positions on client recourse:
-
-- `authorization` with `exact` — no recourse. Settlement is immediate and final.
-- `escrow` with `auth-capture` — recourse purchased with custody: funds enter an escrow
-  contract, and void/refund/capture belong to the captureAuthorizer or an arbiter.
-
-Agent-initiated commerce produces a third case that neither serves well: the payment was
-authorized by software acting for a human, and the human's objection is not *"the goods
-were unsatisfactory"* but *"I never wanted this"* — a misread instruction, a repeated
-checkout, a prompt injection. Arbitration is the wrong instrument for that dispute,
-because there is nothing to arbitrate; the principal simply needs an opportunity to
-decline before value moves.
-
-`cooling-off` provides that opportunity as a property of the flow rather than as a service
-someone operates.
+No funds are escrowed. The binding MUST provide both a ledger-enforced earliest
+settlement time and a payer-authorized way to invalidate the outstanding authorization.
+This flow adds no recourse after settlement.
 
 ## Applicability
 
-`cooling-off` MUST NOT be used where the protected resource is itself the thing of value
-(instant digital delivery, API responses, content). Those resources are the domain of
-`authorization` and `upfront`.
+Appropriate examples include an order acknowledgement, booking reference, refundable
+inventory hold, or work order that becomes effective only after settlement.
 
-`cooling-off` is applicable when the protected resource is a **commitment record** — an
-order acknowledgement, a booking reference, a work order — whose value to the client is
-contingent on the payment settling. Fulfilment of the underlying obligation happens
-after settlement and outside the protocol.
+The flow MUST NOT protect instant digital delivery, an API result, content, a secret, or
+any resource with standalone paid value. Allowing a client to receive such a resource
+and then cancel is free-riding. Delivery disputes and merchant non-performance remain
+out of scope and are better served by `auth-capture` or escrow.
 
-This constraint is what makes the flow safe rather than exploitable; see
-[Security Considerations](#security-considerations).
+The flow guarantees intent finality only within its stated trust and timing profile. It
+does not reserve payer funds; a payer can spend the balance before settlement.
 
-## Requirements
+## Protocol changes
 
-A resource server offering `cooling-off`:
+### Core payment-flow lifecycle
 
-- MUST set `accepts[].extra.paymentFlow` to `"cooling-off"`. §6.1 already requires the key
-  to be present for any flow other than `authorization`.
-- MUST declare the window length in the binding's `extra` (for `exact` / `eip3009`:
-  `coolingOffSeconds`), per resource.
-- MUST NOT deliver, begin, or irreversibly reserve the underlying obligation before
-  settlement succeeds. Returning the commitment record is permitted and is the resource.
-- SHOULD return, in its response, the instant settlement becomes possible and a
-  reference by which the client can observe or withdraw the payment.
+The current core flow model can express settlement before the resource handler or after
+the handler but before the HTTP response. It cannot express response-before-settlement.
+This proposal therefore requires:
 
-A facilitator supporting `cooling-off`:
+- `"cooling-off"` in `PaymentFlowName`; and
+- a deferred-settlement phase or equivalent hook with this configuration:
 
-- MUST verify that the authorization becomes settleable at the declared moment rather
-  than immediately, and MUST NOT treat "not settleable yet" as a verification failure.
-- MUST NOT attempt settlement before that moment, and MUST attempt it promptly once
-  reached.
-- MUST report a client withdrawal as a distinct terminal outcome, not as a settlement
-  error.
+```text
+verifyBeforeHandler       = true
+settleBeforeHandler       = false
+settleAfterHandler        = false
+settleDeferredAfterReply  = true
+```
 
-A client:
+The exact field name is implementation-specific. Its required semantics are not: the
+route returns only after the pending record and durable work are committed, while the
+existing synchronous facilitator `/settle` call runs later in a worker.
 
-- MAY withdraw the payment at any time before settlement, by the mechanism the binding
-  defines.
-- MUST NOT assume the obligation is being fulfilled before settlement.
+### Roles
 
-## Relationship to Other Flows
+- **resource server** advertises the flow, creates the contingent commitment, and owns
+  the obligation not to fulfil early;
+- **coordinator** durably owns pending state, cancellation arbitration, scheduling,
+  retries, and status. It is part of the resource server or an explicitly delegated
+  service for which the resource server remains responsible;
+- **facilitator** keeps the existing synchronous `/verify` and `/settle` semantics. It
+  does not sleep, retain an open HTTP request, or implicitly own a timer;
+- **client** retains the information and authority required to query and, where its
+  conformance profile permits, cancel.
+
+## Request processing
+
+For a paid retry selecting `extra.paymentFlow == "cooling-off"`, the coordinator MUST:
+
+1. call `/verify` and reject an invalid authorization;
+2. construct the commitment record and bind it to a digest of the order and payment;
+3. durably create a unique internal `preparing` record;
+4. idempotently register any promised independent relay paths;
+5. in one final durability boundary, store relay tickets, scheduled work (a
+   transactional outbox is sufficient), and transition `preparing` to `pending`;
+6. return HTTP `202 Accepted` with the commitment record, `Location: <statusUrl>`,
+   `Retry-After`, and a non-terminal `PAYMENT-RESPONSE`;
+7. accept cancellation only through the binding's authenticated mechanism;
+8. when due, atomically choose settlement only if cancellation has not been accepted,
+   then call the unchanged synchronous `/settle`; and
+9. mark the obligation fulfilable only after settlement confirmation/finality.
+
+Returning 202 before step 5 completes is non-conformant. Keeping the original request
+open until the timer fires is also non-conformant because it gives no durable recovery
+contract and defeats the purpose of the asynchronous flow.
+
+## Durable record and idempotency
+
+Before acknowledging a payment, the coordinator MUST persist at least:
+
+| Data | Purpose |
+| :-- | :-- |
+| `paymentId` and order/commitment digest | stable status identity and application binding |
+| complete `PaymentPayload` and requirements | later synchronous settlement and audit |
+| network, asset, payer, nonce | unique ledger identity |
+| `validAfter`, `cancelBy`, `validBefore` | scheduling and race policy |
+| state, version, attempts, next attempt | compare-and-set transitions and retries |
+| settlement/cancellation tx hashes and observed block | chain reconciliation |
+| created/updated timestamps | recovery and audit |
+
+`(network, asset, payer, nonce)` MUST be unique. A duplicate paid request returns the
+existing record; it MUST NOT enqueue another settlement.
+
+The complete signed payment payload becomes a bearer settlement capability when it is
+valid. Storage, logs, backups, and queues MUST therefore be access-controlled and SHOULD
+encrypt it at rest. The payload MUST NOT be exposed by `statusUrl`.
+
+## State machine and recovery
+
+The minimum state machine is:
+
+| State | Terminal | Meaning |
+| :-- | :--: | :-- |
+| `preparing` | No, internal | verified record exists; relay/job acceptance is incomplete and no 202 has been returned |
+| `pending` | No | verified and durably scheduled |
+| `cancel_requested` | No | valid cancellation durably accepted; coordinator settlement disabled |
+| `settlement_submitted` | No | settlement transaction submitted; outcome not final |
+| `settled` | Yes | settlement event/receipt meets finality policy |
+| `canceled` | Yes | cancellation event meets finality policy |
+| `failed` | Yes | deterministic failure or exhausted retry policy |
+| `expired` | Yes | settlement did not succeed before the binding deadline |
+
+The transition from `pending` to either `cancel_requested` or
+`settlement_submitted` MUST use an atomic compare-and-set. Once cancellation is durably
+accepted, the coordinator MUST NOT initiate settlement for that record. If a settlement
+transaction is already in flight, the response MUST say the outcome is raceable rather
+than claim cancellation.
+
+On startup and periodically, the coordinator MUST scan non-terminal records:
+
+- finish or safely abandon `preparing` records using idempotent relay registration;
+- re-arm `pending` records whose job is absent;
+- rebroadcast or continue tracking `cancel_requested` according to relay policy;
+- reconcile receipts and ledger events for submitted transactions;
+- handle a dropped/replaced/reorganized transaction without fulfilling early; and
+- expire records that cannot settle inside the binding deadline.
+
+Retries MUST be idempotent. Transient RPC, fee, or mempool errors MAY be retried; a
+deterministic invalid signature, used/canceled nonce, insufficient balance, or expired
+authorization is reconciled to a terminal result. If a network exposes only a boolean
+used/canceled state, the coordinator MUST inspect the corresponding events to determine
+which terminal outcome occurred.
+
+## Pending and status transport
+
+Current HTTP transport documents only settled success (`200`) and failure (`402`). This
+flow adds a recognized non-terminal mapping:
+
+```http
+HTTP/1.1 202 Accepted
+Location: https://merchant.example/x402/payments/pay_01J...
+Retry-After: 3
+PAYMENT-RESPONSE: <base64 SettlementResponse>
+```
+
+The decoded `SettleResponse` is:
+
+```json
+{
+  "success": false,
+  "errorReason": "settlement_pending",
+  "transaction": "",
+  "network": "eip155:43114",
+  "payer": "0x855A...F424",
+  "extensions": {
+    "cooling-off": {
+      "info": {
+        "state": "pending",
+        "paymentId": "pay_01J...",
+        "settleableAt": 1786822425,
+        "cancelBy": 1786822410,
+        "expiresAt": 1786826025,
+        "statusUrl": "https://merchant.example/x402/payments/pay_01J...",
+        "cancelUrl": "https://merchant.example/x402/payments/pay_01J.../cancel",
+        "relayCancelUrls": ["https://relay.example/x402/cancel/rt_01J..."]
+      },
+      "schema": {
+        "type": "object",
+        "required": ["state", "paymentId", "statusUrl"]
+      }
+    }
+  }
+}
+```
+
+For a recognized flow, `settlement_pending` is non-terminal; `success: false` truthfully
+states that settlement has not succeeded. A pending response MUST NOT use `success:
+true` or invent a transaction hash. Clients that do not recognize this flow already skip
+its `accepts[]` entry and therefore do not need to infer the extended semantics.
+
+`GET statusUrl` MUST be safe, idempotent, and return the same `SettleResponse` as JSON
+and in `PAYMENT-RESPONSE`. Terminal mappings are:
+
+| State | `success` | `errorReason` | `transaction` |
+| :-- | :--: | :-- | :-- |
+| `settled` | `true` | omitted | settlement hash |
+| `canceled` | `false` | `canceled_by_client` | cancellation hash |
+| `failed` | `false` | specific stable reason | hash if one exists, otherwise empty |
+| `expired` | `false` | `authorization_expired` | empty |
+
+Status and cancellation URLs MUST be unguessable or separately access-controlled, use
+HTTPS, and disclose no signature or sensitive order data.
+
+## Cancellation discovery and relay contract
+
+`PaymentRequired.extensions["cooling-off"].info` advertises client capabilities before
+signing:
+
+```json
+{
+  "cancelRelayUrls": ["https://relay.example/x402/cancel"],
+  "statusProtocol": "poll-v1"
+}
+```
+
+The extension is echoed in `PaymentPayload` under normal x402 extension rules. The
+pending response supplies two distinct kinds of endpoint:
+
+- `cancelUrl` is coordinator-owned. Acceptance there atomically changes the coordinator
+  record to `cancel_requested` and stops its own settlement job; and
+- `relayCancelUrls` are record-specific broadcast endpoints created from the advertised
+  relay services. They MAY be independently operated and cannot atomically mutate the
+  coordinator database.
+
+Coordinator or relay acceptance is not ledger cancellation. The coordinator returns
+`202 cancel_requested`; an independent relay returns `202 relay_accepted`. They return
+`200 canceled` only after the binding's transaction meets finality. Both MUST return
+explicit outcomes for invalid signature, unknown payment,
+already settled/canceled, late raceable requests, and relay unavailability.
+
+Relay operators MUST accept only a payment they can bind to a previously verified
+record, verify all record fields and the cancellation signature, rate-limit by payment
+and payer, and make duplicate requests idempotent. An open endpoint that pays gas for an
+arbitrary nonce is non-conformant and exposes a gas-drain vector.
+
+A principal-protected client SHOULD submit first to `cancelUrl` to stop an honest
+coordinator and also retain or use an independent broadcast path. If the coordinator is
+unavailable or suppresses the request, the independent path still competes on chain,
+subject to the binding's safety cutoff.
+
+A broadcastable signature is **relayable**, not protocol-guaranteed gasless. Payer
+gaslessness is an operational property of a named relay. Direct self-broadcast remains a
+valid fallback. A merchant relay alone is not an independent cancellation path because
+the merchant can withhold it.
+
+## Authority profiles
+
+SDKs and product/security claims MUST declare one of these profiles:
+
+- **mistake-recovery** protects cooperative signer mistakes and duplicate actions. It
+  makes no claim that a human can overrule an adversarial agent holding the only payer
+  key.
+- **principal-protected** requires a human/recovery cancellation path independent of
+  the agent process and a broadcast path independent of the merchant. The binding
+  specifies how the payer address validates multiple wallet authorities.
+
+The profile is a client-wallet security property, not a claim a resource server can
+verify from an EOA address. A client MAY self-declare it in the echoed extension for
+telemetry or policy, but a server MUST NOT treat that declaration as proof.
+
+## Resource-server requirements
+
+A resource server offering this flow:
+
+- MUST set `accepts[].extra.paymentFlow` to `"cooling-off"`;
+- MUST advertise all binding timing parameters;
+- MUST return only a contingent commitment before settlement;
+- MUST keep fulfilment disabled until terminal settlement finality;
+- MUST expose durable status and an authenticated cancellation path; and
+- MUST retain enough audit data to reconcile its application order with the ledger.
+
+It MAY reserve reversible capacity during the window, but SHOULD rate-limit repeated
+commit/cancel griefing and MUST NOT describe a reversible hold as fulfilment.
+
+## Security considerations
+
+**Late cancellation and race.** A cancellation request is not a cancellation. The
+binding MUST define a safety cutoff and finality rule, and clients MUST label later
+requests best-effort. Ledger order decides once cancellation and settlement are both
+valid or already submitted.
+
+**Coordinator failure.** A process timer is insufficient. Atomic persistence, restart
+recovery, chain reconciliation, idempotency, and bounded retry are normative because a
+202 response creates a server obligation even though no payment has settled.
+
+**Merchant withholding.** The coordinator promises not to settle after accepting a
+valid cancellation, but a merchant-controlled relay cannot prove cancellation liveness.
+The principal-protected profile therefore needs direct or independent relay access.
+
+**Griefing and solvency.** The payer can cancel or spend the funds, consuming reversible
+server capacity. Rate limits and low-cost holds are expected; escrow is required when
+the server needs guaranteed funds.
+
+**Delivery risk.** Settlement does not prove delivery. This proposal deliberately does
+not solve the buyer-protection problem discussed in issue #1169.
+
+## Relationship to other flows
 
 | | `authorization` | `upfront` | `escrow` | `cooling-off` |
 | :-- | :-- | :-- | :-- | :-- |
-| Ordering | verify → resource → settle → respond | settle → resource → respond | settle → resource → settle → respond | verify → resource → respond → settle |
-| Funds before settlement | in client's wallet | committed first | in escrow | **in client's wallet** |
-| Client may withdraw after authorizing | No | No | Via operator/arbiter, or reclaim after deadline | **Yes, unilaterally** |
-| Recourse after settlement | None | None | Refund window | None |
-| Resource may be the deliverable | Yes | Yes | Yes | **No — commitment only** |
+| Response before final settlement | No | No | Between escrow and capture | **Yes, explicitly pending** |
+| Funds during window | payer wallet | settled | escrow | **payer wallet** |
+| Pre-settlement payer invalidation | No | No | operator/arbiter rules | **binding-defined** |
+| Post-settlement recourse | No | No | Yes | **No** |
+| Pre-settlement resource | paid resource | paid resource | paid resource | **contingent commitment only** |
 
-`cooling-off` and `escrow` are complements, not competitors. `escrow` guarantees the funds
-will be there and provides recourse after delivery, at the cost of custody, a deployed
-contract, and a trusted operator. `cooling-off` guarantees only that a settled payment is
-one the principal did not veto, and provides nothing after settlement — but requires no
-custody, no contract, and no trusted party. A resource server MAY offer both in
-`accepts[]` and let the client choose.
+Batch settlement is precedent for representing a commitment before later financial
+settlement, but its commitment and trust model differ. A revocable authorization MUST
+remain visibly pending and MUST NOT be represented as capital-backed or final.
 
-## Security Considerations
+## References
 
-**Free-riding.** [#1169](https://github.com/x402-foundation/x402/issues/1169) documents
-a client cancelling an authorization after receiving a resource, leaving the facilitator
-unable to collect. `cooling-off` deliberately grants that same capability, and is safe only
-because of the applicability constraint above: the resource in this flow is a commitment
-record with no standalone value, and the obligation it commits to is not begun until
-settlement. A client who withdraws obtains nothing. Facilitators MAY decline to serve
-`cooling-off` to resource servers they believe deliver value pre-settlement; this is not
-detectable from the payload.
-
-**Risk inversion.** #1169's thread notes that settling before delivery moves risk onto
-the client. `cooling-off` is the milder form of that trade: the client's funds are not
-committed during the window either, so the client's exposure begins only at settlement —
-and the client, not the server, chooses when to stop objecting.
-
-**Solvency.** The flow guarantees intent, not funds. Because the money remains with the
-client, the client MAY spend it during the window, in which case settlement fails. The
-resource server's loss is a cancelled commitment, never a delivered obligation.
-
-**Withdrawal availability.** The value of the window depends on the principal being able
-to act within it. Resource servers SHOULD surface a human-reachable confirmation
-reference; bindings SHOULD prefer withdrawal mechanisms that do not require the client
-to hold native gas.
-
-**Griefing.** A client, or a compromised agent, MAY commit and withdraw repeatedly,
-consuming resource-server capacity such as inventory holds. The flow provides no defence;
-resource servers SHOULD rate-limit and SHOULD avoid irreversible reservations before
-settlement.
-
-**Window integrity.** Where the window is enforced by a ledger primitive, it is only as
-precise as that ledger's clock. Bindings MUST specify the tolerance a facilitator applies
-and SHOULD NOT permit windows shorter than the network's block-time variance.
-
-**Late settlement.** If a facilitator settles later than the declared moment, the client's
-ability to withdraw persists for as long as the payment is unsettled. This degrades in
-the client's favour and never the server's; bindings MUST state whether withdrawal is
-gated on the clock or on the payment being unspent.
-
-## Network Bindings
-
-A network can support `cooling-off` if its payment primitive can express "not settleable
-before time T" and offers the client a way to invalidate an outstanding authorization.
-
-- **EVM, `exact` / `eip3009`** — [`cooling-off-flow-exact-eip3009.md`](cooling-off-flow-exact-eip3009.md).
-  EIP-3009 supplies both: `validAfter` for the window and `cancelAuthorization` for a
-  gasless client withdrawal. Already deployed on USDC, XSGD and other FiatToken assets;
-  no new contract required.
-- Other networks are out of scope for this proposal. A binding MUST NOT be claimed for a
-  network whose primitive lacks a client-invalidation path, since the window would then
-  be a delay without a veto.
-
-### References
-
-- [x402 specification v2 §6.1](https://github.com/x402-foundation/x402/blob/main/specs/x402-specification-v2.md) — payment flow models this extends
-- [`auth-capture` scheme](https://github.com/x402-foundation/x402/blob/main/specs/schemes/auth-capture/scheme_auth_capture.md) — the custody-based answer to client recourse
-- [Issue #1169](https://github.com/x402-foundation/x402/issues/1169) — pre-settlement client cancellation as a free-riding vector, and the risk-inversion objection
-- [PR #1133](https://github.com/x402-foundation/x402/pull/1133) — `subscribe`, prior use of future-dated `validAfter` within x402
-- [Issue #3085](https://github.com/x402-foundation/x402/issues/3085) — settlement timing is not currently expressible in `SettlementResponse`
+- [x402 specification v2](https://github.com/x402-foundation/x402/blob/main/specs/x402-specification-v2.md)
+- [x402 HTTP transport v2](https://github.com/x402-foundation/x402/blob/main/specs/transports-v2/http.md)
+- [batch-settlement scheme](https://github.com/x402-foundation/x402/blob/main/specs/schemes/batch-settlement/scheme_batch_settlement.md)
+- [`auth-capture` scheme](https://github.com/x402-foundation/x402/blob/main/specs/schemes/auth-capture/scheme_auth_capture.md)
+- [Issue #1169](https://github.com/x402-foundation/x402/issues/1169)

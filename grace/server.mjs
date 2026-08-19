@@ -143,13 +143,16 @@ async function acceptPayment(sku, envelopeB64) {
 }
 
 /**
- * GRACE Autopilot, precise mode: one EventBridge Scheduler one-shot per order,
- * firing at the exact second the chain first allows settlement. The schedule
+ * GRACE Autopilot hack-demo mode: one EventBridge Scheduler one-shot per order,
+ * firing after the chain first allows settlement. The schedule
  * deletes itself after firing (ActionAfterCompletion). Runs on the instance
  * role via the preinstalled aws CLI; requires AUTOPILOT_AT=1.
  *
  * If the payer cancels during the window, the schedule still fires and the
- * settle attempt reverts on-chain — which is the product working, not a bug.
+ * settle attempt reverts on-chain — which is the token primitive working.
+ * This demo path is not the durable coordinator specified by the proposal: a
+ * production implementation must commit state + outbox before returning 202,
+ * recover after restart, and stop its own settlement job on cancel acceptance.
  */
 function scheduleAutopilot(record) {
   if (process.env.AUTOPILOT_AT !== '1') return
@@ -306,7 +309,7 @@ const server = createServer(async (req, res) => {
         cooling_off_seconds: record.windowSeconds,
         settle_opens_at: record.opensAt,
         confirm_url: `${PUBLIC_URL}/pay/${record.id}`,
-        message: `Order accepted. Settlement is chain-blocked until ${new Date(record.opensAt * 1000).toISOString()}. The payer may cancel until then.`,
+        message: `Order accepted. Settlement is chain-blocked until ${new Date(record.opensAt * 1000).toISOString()}. Cancellation near that boundary may race; production clients use an earlier cancelBy safety cutoff.`,
       })
     }
 

@@ -79,9 +79,10 @@ export function whyPage(net) {
   <div class="rulebar"></div>
 
   <h2>The deadlock nobody demos</h2>
-  <p>When an AI agent places an order, the merchant cannot tell whether the human behind it
-  actually wanted it. A misread instruction, a prompt injection, a duplicate checkout — all of
-  them arrive looking exactly like a legitimate purchase.</p>
+  <p>When an AI agent places an order, the merchant cannot tell whether the principal behind it
+  actually wanted it. A misread instruction and a duplicate checkout arrive looking exactly
+  like a legitimate purchase. Protection from a prompt-injected agent additionally requires
+  an independent payer signer or recovery authority that the agent cannot disable.</p>
   <p>In the card world, every dispute maps to a reason code — and <b>no reason code exists for
   “my agent did it.”</b> On-chain it is worse: settlement is instant and final, so the buyer's
   protection is zero. A rational merchant facing agent traffic has two moves: refuse it, or
@@ -109,8 +110,9 @@ export function whyPage(net) {
       <p><code>receiveWithAuthorization</code> requires <code>msg.sender == payee</code>.
       A stolen signature is worthless to anyone else — <b>we proved this on mainnet</b>.</p></div>
     <div><div class="h mR">Only the payer can void it</div>
-      <p><code>cancelAuthorization</code> must be signed by the payer — and it is a
-      meta-transaction, so <b>a phone with zero gas can still kill a payment</b>.</p></div>
+      <p><code>cancelAuthorization</code> must be signed by the payer and is relayable.
+      <b>A zero-gas phone can cancel only when a funded relay accepts and lands it</b>;
+      self-broadcast remains the fallback.</p></div>
   </div>
   <p>Neither side can do the other's job. No third party can do either. That is dispute
   protection with no one in the middle — enforced by the token, not by our server.</p>
@@ -146,12 +148,12 @@ export function whyPage(net) {
   <div class="sponsor">
     <div><div class="h" style="color:var(--violet)">XSGD · StraitsX</div>
       <p><b>Carries the rule.</b> The entire dispute layer lives inside FiatTokenV2_2 as
-      already deployed. StraitsX could publish <code>exact-deferred</code> tomorrow without
-      shipping anything — and it works on any EIP-3009 token, USDC included.</p></div>
+      already deployed. A protocol profile still has to verify each deployed token's timing,
+      cancellation, event, and smart-wallet capabilities before advertising support.</p></div>
     <div><div class="h" style="color:#c0392b">Avalanche</div>
-      <p><b>Makes a 90-second window safe.</b> ~2 s finality means the veto lands long before
-      the edge; on a slower chain the race window would swallow the product. Every settlement
-      and every cancellation here is a real C-Chain transaction.</p></div>
+      <p><b>Makes a practical safety buffer possible.</b> The normal cancellation deadline
+      must precede <code>validAfter</code> by enough time for inclusion and finality; a request
+      near the edge can still race settlement. Every transaction here is real C-Chain state.</p></div>
     <div><div class="h" style="color:var(--amber)">AWS</div>
       <p><b>Decides when to ask — never whether it succeeds.</b> Each order gets a one-shot
       EventBridge schedule at <code>validAfter</code> → Lambda rings the settle endpoint.

@@ -102,7 +102,8 @@ export async function settle(net, merchantAccount, { authorization, v, r, s }) {
 
 /**
  * Burn the nonce. Signed by the payer, broadcast by whoever holds gas —
- * here the GRACE relayer, so a phone with zero AVAX can still kill a payment.
+ * here the configured GRACE demo relayer. Zero-AVAX cancellation depends on that
+ * relayer being funded, available, and successfully landing the transaction.
  */
 export async function broadcastCancel(net, relayerAccount, { message, v, r, s }) {
   const wallet = walletClientFor(net, relayerAccount)

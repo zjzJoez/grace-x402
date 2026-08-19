@@ -96,7 +96,7 @@ const cancellation = await signCancellation(payer, net, pending.authorization.no
 const cancelSim = await simulateCancel(net, bystander.address, cancellation, client)
 check(cancelSim.ok,
   'cancelAuthorization succeeds, broadcast by a wallet that is NOT the payer',
-  cancelSim.ok ? 'gasless for the payer — any relayer can submit it' : cancelSim.reason)
+  cancelSim.ok ? 'relayable — payer gaslessness depends on an available funded relayer' : cancelSim.reason)
 
 // A cancellation signed by someone else must not work.
 const forged = await signCancellation(bystander, net, pending.authorization.nonce)
