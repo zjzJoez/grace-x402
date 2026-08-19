@@ -1,7 +1,11 @@
 # Payment Flow: `cooling-off`
 
-> Proposed addition to `x402-specification-v2.md` §6.1. The EVM binding is
-> [`cooling-off-flow-exact-eip3009.md`](cooling-off-flow-exact-eip3009.md).
+> Proposed addition to `x402-specification-v2.md` §6.1. Two EVM bindings, both with
+> zero new contracts: [`cooling-off-flow-exact-eip3009.md`](cooling-off-flow-exact-eip3009.md)
+> (gasless payer cancel, EIP-3009 tokens) and
+> [`cooling-off-flow-exact-permit2.md`](cooling-off-flow-exact-permit2.md)
+> (payer-gas cancel, any ERC-20 — the on-chain window check already ships in
+> x402's own `x402ExactPermit2Proxy`).
 
 ## Summary
 
@@ -187,6 +191,11 @@ The decoded `SettleResponse` is:
 }
 ```
 
+[x402-foundation/x402#3208](https://github.com/x402-foundation/x402/issues/3208) proposes
+the transport-neutral vocabulary this flow actually wants — `settled` / `pending` /
+`deferred_until(T)` / `canceled(by)` — as an additive evolution of `SettleResponse`.
+Until that lands, this flow maps onto today's fields as follows.
+
 For a recognized flow, `settlement_pending` is non-terminal; `success: false` truthfully
 states that settlement has not succeeded. A pending response MUST NOT use `success:
 true` or invent a transaction hash. Clients that do not recognize this flow already skip
@@ -247,6 +256,18 @@ gaslessness is an operational property of a named relay. Direct self-broadcast r
 valid fallback. A merchant relay alone is not an independent cancellation path because
 the merchant can withhold it.
 
+## Clock and window integrity
+
+The window is enforced against ledger time, while the client signs with its own clock.
+Two rules keep a skewed clock from silently shrinking or erasing the human's window:
+
+- The resource server (or facilitator) MUST bound the signed activation time against its
+  own clock at verification — reject when the remaining window is materially shorter or
+  implausibly longer than advertised — and MUST report a large discrepancy rather than
+  accept a degraded window. Bindings state concrete tolerances.
+- Any user-facing countdown MUST be derived from the absolute signed activation time
+  (as the ledger will enforce it), never from the advertised window length.
+
 ## Authority profiles
 
 SDKs and product/security claims MUST declare one of these profiles:
@@ -261,6 +282,20 @@ SDKs and product/security claims MUST declare one of these profiles:
 The profile is a client-wallet security property, not a claim a resource server can
 verify from an EOA address. A client MAY self-declare it in the echoed extension for
 telemetry or policy, but a server MUST NOT treat that declaration as proof.
+
+## Intent binding
+
+The payment authorization signs payment fields, not the application order. Two profiles:
+
+- **digest-nonce** (lightweight): the authorization nonce commits to a canonical order
+  digest. When used, the canonicalization rules and salt-disclosure procedure MUST be
+  normative in the binding, and the nonce MUST include an unpredictable salt — otherwise
+  the commitment is invisible to any third party and leaks order linkage.
+- **signed-intent** (checkable): the client additionally signs a self-describing intent
+  record that a facilitator or auditor can verify without the resource server's
+  cooperation. Heavier, but this flow's audience is precisely the claim — "my agent
+  bought something I didn't want" — that someone will eventually need to audit.
+  Deployments making `principal-protected` claims SHOULD use it.
 
 ## Resource-server requirements
 

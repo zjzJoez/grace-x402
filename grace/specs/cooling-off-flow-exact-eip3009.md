@@ -180,6 +180,20 @@ then re-check signature/policy validity, nonce, balance, `block.timestamp > vali
 and `block.timestamp < validBefore`; it MUST NOT reapply the initial "future window"
 test and reject a correctly matured payment.
 
+### Client display rule
+
+Any countdown or "cancellable until" indication shown to the human MUST be derived from
+the absolute `validAfter` in the signed authorization — the value the token contract
+will enforce — never from the advertised `coolingOffSeconds`. A skewed client clock then
+mislabels nothing: the display and the chain agree by construction.
+
+### Intent binding profiles
+
+This binding supports both profiles of the flow document's Intent binding section: the
+salted digest-nonce (canonicalization and salt disclosure per the rules above) and, for
+`principal-protected` deployments, an additional client-signed intent record verifiable
+without the resource server's cooperation.
+
 ## Durable coordinator and synchronous `/settle`
 
 The resource server, not `/settle`, owns delayed execution:
