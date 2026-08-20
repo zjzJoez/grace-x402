@@ -194,7 +194,12 @@ The decoded `SettleResponse` is:
 [x402-foundation/x402#3208](https://github.com/x402-foundation/x402/issues/3208) proposes
 the transport-neutral vocabulary this flow actually wants — `settled` / `pending` /
 `deferred_until(T)` / `canceled(by)` — as an additive evolution of `SettleResponse`.
-Until that lands, this flow maps onto today's fields as follows.
+Two properties of that vocabulary matter to this flow specifically, and bindings MUST
+supply them: `settled` carries the settlement timestamp, and `canceled` carries a
+**revocation reference** so the terminal state is re-derivable from the ledger rather
+than taken on the facilitator's word — the `AuthorizationCanceled` transaction under the
+EIP-3009 binding, the `UnorderedNonceInvalidation` event under the Permit2 binding.
+Until #3208 lands, this flow maps onto today's fields as follows.
 
 For a recognized flow, `settlement_pending` is non-terminal; `success: false` truthfully
 states that settlement has not succeeded. A pending response MUST NOT use `success:
