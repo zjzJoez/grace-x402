@@ -92,6 +92,25 @@ Unchanged from `exact` / `permit2` except the witness derivation:
 The client MUST persist the nonce (and derived `wordPos`/`mask`) wherever the human's
 cancellation affordance lives, so the veto does not depend on the agent process.
 
+## Intent binding profiles
+
+Both profiles of the flow document's Intent binding section apply, with one constraint
+specific to this binding: **the Permit2 nonce doubles as the cancellation handle.**
+
+- **digest-nonce.** A nonce derived from a canonical order digest MUST still include an
+  unpredictable salt, and the binding's canonicalization and salt-disclosure rules
+  apply unchanged. Additionally, whatever the derivation, the client MUST be able to
+  recover `wordPos = nonce >> 8` and `mask = 1 << uint8(nonce)` at cancellation time
+  without re-deriving the digest from data it may no longer hold — so the derived nonce
+  MUST be persisted alongside the human's cancellation affordance, not merely
+  recomputable in principle. A derivation that makes the nonce recoverable only by the
+  agent process defeats the `principal-protected` profile.
+- **signed-intent.** Unchanged from the flow document: a separately signed, self-
+  describing intent record that a third party can verify without the resource server.
+  RECOMMENDED here, because it lets the nonce stay a plain random value — keeping the
+  cancellation handle trivially derivable — while the auditable order binding lives in
+  its own artifact.
+
 ## Verification
 
 As `exact` / `permit2`, with the same two changes as the EIP-3009 binding:

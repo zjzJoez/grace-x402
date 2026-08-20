@@ -203,8 +203,15 @@ Until #3208 lands, this flow maps onto today's fields as follows.
 
 For a recognized flow, `settlement_pending` is non-terminal; `success: false` truthfully
 states that settlement has not succeeded. A pending response MUST NOT use `success:
-true` or invent a transaction hash. Clients that do not recognize this flow already skip
-its `accepts[]` entry and therefore do not need to infer the extended semantics.
+true` or invent a transaction hash.
+
+An unaware client is protected by verification, not by selection behaviour. Stock
+clients typically match an `accepts[]` entry on scheme and network and MAY select this
+one despite the unrecognized `paymentFlow`; such a client signs an immediate,
+backdated activation time, and the verification rule above — the remaining delay MUST
+fall within the advertised window — rejects it deterministically with a clean `402`
+rather than admitting a payment with no cooling-off period. The safety property comes
+from verify.
 
 `GET statusUrl` MUST be safe, idempotent, and return the same `SettleResponse` as JSON
 and in `PAYMENT-RESPONSE`. Terminal mappings are:
