@@ -94,7 +94,8 @@ Identical to `exact` / `permit2` today, plus the flow keys:
     "assetTransferMethod": "permit2",
     "paymentFlow": "cooling-off",
     "coolingOffSeconds": 90,
-    "cancellationSafetySeconds": 10
+    "cancellationSafetySeconds": 10,
+    "quoteExpiresAt": 1786822395
   }
 }
 ```
@@ -118,23 +119,17 @@ cancellation affordance lives, so the veto does not depend on the agent process.
 Both profiles of the flow document's Intent binding section apply, with one constraint
 specific to this binding: **the Permit2 nonce doubles as the cancellation handle.**
 
-- **digest-nonce.** A nonce derived from a canonical order digest MUST still include an
-  unpredictable salt, and the binding's canonicalization and salt-disclosure rules
-  apply unchanged. Additionally, whatever the derivation, the client MUST be able to
-  recover `wordPos = nonce >> 8` and `mask = 1 << uint8(nonce)` at cancellation time
-  without re-deriving the digest from data it may no longer hold — so the derived nonce
-  MUST be persisted alongside the human's cancellation affordance, not merely
-  recomputable in principle. A derivation that makes the nonce recoverable only by the
-  agent process defeats the `principal-protected` profile.
-- **signed-intent.** Unchanged from the flow document: a separately signed, self-
-  describing intent record that a third party can verify without the resource server.
-  RECOMMENDED here, because it lets the nonce stay a plain random value — keeping the
-  cancellation handle trivially derivable — while the auditable order binding lives in
-  its own artifact.
+- **digest-nonce.** The salt and canonicalization rules apply unchanged, plus one
+  constraint: whatever the derivation, the derived nonce MUST be persisted alongside
+  the human's cancellation affordance — recoverable without re-deriving the digest —
+  because a nonce only the agent process can reproduce defeats `principal-protected`.
+- **signed-intent.** RECOMMENDED here: it lets the nonce stay plain random — keeping
+  the cancellation handle trivially derivable — while the auditable order binding
+  lives in its own artifact.
 
 ## Verification
 
-As `exact` / `permit2`, with the same two changes as the EIP-3009 binding:
+As `exact` / `permit2`, with the same changes as the EIP-3009 binding:
 
 1. Replace the "active now" check with the window check:
    `|witness.validAfter − (now + coolingOffSeconds)| <= skewTolerance` against a recent
@@ -142,6 +137,8 @@ As `exact` / `permit2`, with the same two changes as the EIP-3009 binding:
    apply when `paymentFlow` is `cooling-off`).
 2. A settlement simulation before `validAfter` is expected to revert `PaymentTooEarly()`
    and MUST be classified as the window holding, not as a verification failure.
+3. The shared guardrails apply unchanged: `cancellationSafetySeconds` MUST NOT exceed
+   25% of `coolingOffSeconds`, and acceptance after `quoteExpiresAt` MUST be refused.
 
 Nonce-unused is read from `Permit2.nonceBitmap(payer, wordPos)`; balance and allowance
 checks are indicative only (funds stay with the payer during the window).
