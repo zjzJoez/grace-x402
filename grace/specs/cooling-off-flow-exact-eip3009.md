@@ -509,7 +509,14 @@ one field different (`node grace/facilitator-probe.mjs`, 2026-08-23):
 
 Both reject on the window alone, with the reference implementation's canonical
 identifier (`ErrValidAfterInFuture`). Nothing was settled — `/verify` is
-read-only — and the probe is reproducible by anyone with a funded wallet.
+read-only.
+
+An independent re-run from an **unfunded** wallet ([#3182](https://github.com/x402-foundation/x402/issues/3182),
+2026-08-23) established something the funded run could not: both facilitators
+evaluate the window *before* the balance. The unfunded control got past the
+window and failed on `invalid_exact_evm_insufficient_balance`, while the cooling
+payload never got that far. So the refusal that carries this proposal reproduces
+with no funds at all; funding only adds the control's acceptance.
 
 This is the precise, and only, behaviour the binding asks to be made
 flow-conditional: unchanged for `exact`, relaxed when `paymentFlow` is

@@ -16,6 +16,8 @@
  *   cooling    validAfter = now + 90    (what this flow needs)
  *
  * Nothing is settled and no funds move: /verify is read-only by specification.
+ * An unfunded key still demonstrates the refusal — these facilitators evaluate
+ * the window before the balance — it just cannot get the control accepted.
  */
 
 import { privateKeyToAccount } from 'viem/accounts'
@@ -44,14 +46,18 @@ const net = pickNetwork('mainnet')
 const client = publicClientFor(net)
 const KEYS = join(HERE, '.keys.json')
 if (!existsSync(KEYS)) {
-  console.error(`\nThis probe needs a funded wallet, because a facilitator checks the payer's
-balance before it gets as far as the window. Create ${KEYS}:
+  console.error(`\nThis probe needs a key to sign with. Create ${KEYS}:
 
-    { "buyer": "0x<private key of a wallet holding a little XSGD on Avalanche>" }
+    { "buyer": "0x<any private key>" }
 
-It is gitignored. The probe signs authorizations but never settles one — /verify
-is read-only — and it pays to your own address, so nothing can move even if a
-signature leaked.\n`)
+An UNFUNDED key is enough for the claim that matters: these facilitators check
+the window before the balance, so the cooling payload is refused on validAfter
+whether or not you hold anything. Funding it with a little XSGD on Avalanche
+additionally gets the control accepted, which completes the comparison.
+
+The file is gitignored. The probe signs authorizations but never settles one —
+/verify is read-only — and it pays to your own address, so nothing can move even
+if a signature leaked.\n`)
   process.exit(1)
 }
 const buyer = privateKeyToAccount(JSON.parse(readFileSync(KEYS, 'utf8')).buyer)
@@ -121,34 +127,55 @@ const bal = await balanceOf(net, buyer.address, client)
 console.log(`\n\x1b[1mWhat a live facilitator says about a cooling-off payload\x1b[0m`)
 console.log(D(`  chain    ${net.label} (eip155:${net.chain.id})`))
 console.log(D(`  asset    XSGD ${net.token}`))
-console.log(D(`  payer    ${buyer.address}  (${toSgd(bal)} XSGD — funded, so balance is not the objection)`))
-console.log(D(`  amount   0.10 XSGD · /verify only, nothing is settled\n`))
+const funded = bal > 0n
+console.log(D(`  payer    ${buyer.address}  (${toSgd(bal)} XSGD${funded ? ' — funded, so balance is not the objection' : ''})`))
+console.log(D(`  amount   0.10 XSGD · /verify only, nothing is settled`))
+if (!funded) {
+  console.log(Y(`  note     unfunded wallet — running in degraded mode. The control cannot be`))
+  console.log(Y(`           accepted, so the full claim is not demonstrated; what remains is`))
+  console.log(Y(`           the check ordering, which is itself worth seeing.\n`))
+} else {
+  console.log('')
+}
 
 const cases = [
   { label: 'control — validAfter 600s in the PAST (what SDKs send today)', offset: -600 },
   { label: 'cooling  — validAfter 90s in the FUTURE (what this flow needs)', offset: 90 },
 ]
 
-let proved = 0
+let proved = 0, ordering = 0
 for (const f of FACILITATORS) {
   console.log(`\x1b[1m${f.name}\x1b[0m ${D(f.url)}`)
-  const seen = {}
+  const seen = {}, accepted = {}
   for (const c of cases) {
     const r = await ask(f, await payload(c.offset)).catch((e) => ({ status: 0, text: e.message }))
     const reason = r.json?.invalidReason ?? r.json?.invalidCode ?? r.text
     const valid = r.json?.isValid
     seen[c.offset] = reason
+    accepted[c.offset] = valid === true
     const verdict = valid ? G('ACCEPTED') : (String(reason).includes(WINDOW_ERROR) ? Y('REJECTED — the window') : R('rejected'))
     console.log(`  ${c.label}`)
     console.log(`    HTTP ${r.status}  ${verdict}  ${D(String(reason).slice(0, 90))}`)
   }
   const control = String(seen[-600] ?? '')
   const cooling = String(seen[90] ?? '')
-  if (cooling.includes(WINDOW_ERROR) && !control.includes(WINDOW_ERROR)) {
+  const coolingRefusedOnWindow = cooling.includes(WINDOW_ERROR)
+
+  if (coolingRefusedOnWindow && accepted[-600] === true) {
+    // The full claim: same structure, one accepted, one refused on the window.
     console.log(G(`  ⇒ the payloads differ only in the activation time and what follows from`))
     console.log(G(`    it (validBefore, and a fresh nonce as each must have). The refusal names`))
-    console.log(G(`    validAfter, and the control passes with the same structure.\n`))
+    console.log(G(`    validAfter, and the control is accepted with the same structure.\n`))
     proved++
+  } else if (coolingRefusedOnWindow && !control.includes(WINDOW_ERROR)) {
+    // Degraded but informative: the control failed for its own reason, which
+    // means it got PAST the window check — so the window is evaluated before
+    // whatever stopped it. Reproducible with no funds at all.
+    console.log(Y(`  ⇒ partial: the cooling payload is refused on the window, but the control`))
+    console.log(Y(`    was not accepted either (${control.slice(0, 44)}).`))
+    console.log(Y(`    It still shows the ordering — the control got past the window and died`))
+    console.log(Y(`    later, the cooling payload never got that far.\n`))
+    ordering++
   } else {
     console.log(D(`  ⇒ inconclusive here — control: ${control.slice(0, 60)}\n`))
   }
@@ -156,5 +183,9 @@ for (const f of FACILITATORS) {
 
 console.log(proved
   ? G(`■ ${proved}/${FACILITATORS.length} facilitators reproduce the gap this flow exists to close.`)
-  : R(`■ no facilitator reproduced the expected rejection — re-check the payload shape.`))
+  : ordering
+    ? Y(`■ ${ordering}/${FACILITATORS.length} refuse the cooling payload on the window, but no control was
+  accepted, so this run shows the ordering rather than the full claim. Fund the
+  wallet with a little XSGD for the complete demonstration.`)
+    : R(`■ no facilitator reproduced the expected rejection — re-check the payload shape.`))
 console.log(D(`  This is the claim the proposal makes about deployed software, tested rather than asserted.\n`))
