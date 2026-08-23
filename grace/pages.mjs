@@ -203,7 +203,7 @@ export function storefrontPage(catalog, net, merchantAddr) {
     <div class="card">
       <b>Protocol</b>
       <div class="dim" style="margin-top:8px">
-        POST /checkout {"sku": …} → <code>402</code> with scheme <code>exact-deferred</code> and
+        POST /checkout {"sku": …} → <code>402</code> with scheme <code>exact</code>, flow <code>cooling-off</code> and
         <code>extra.coolingOffSeconds</code>.<br><br>
         The agent signs a standard EIP-3009 ReceiveWithAuthorization with
         <code>validAfter = now + coolingOffSeconds</code>. Until validAfter, XSGD itself refuses

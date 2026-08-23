@@ -25,7 +25,7 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
     <div class="top">
       <div>
         <div class="brand">The claim moves now. <b>The money moves only after the veto window.</b></div>
-        <div class="tag">GRACE · a cooling-off rail for agentic payments · x402 scheme <code>exact-deferred</code></div>
+        <div class="tag">GRACE · a cooling-off rail for agentic payments · x402 <code>exact</code> · flow <code>cooling-off</code></div>
         <div class="sub">No dispute code exists for <i>“my agent did it.”</i> This demo shows a separately controlled payer wallet cancel before settlement. <a class="whylink" href="/why">scope and limits →</a></div>
       </div>
       <div class="chain">

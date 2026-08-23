@@ -59,21 +59,39 @@ const orders = new Map(
 const persist = () => writeFileSync(ORDERS_PATH, JSON.stringify([...orders.values()], null, 2))
 
 // ── x402 challenge ───────────────────────────────────────────────────────────
+/**
+ * The tail of the window that is inclusion-and-finality buffer rather than
+ * decision time. Kept to a small fraction so the interval a human actually gets
+ * stays close to the advertised one — a 90s window whose last 89s are "safety
+ * margin" is conformant and dishonest, which is the case the spec now forbids.
+ */
+const cancellationSafetyFor = (windowSeconds) =>
+  windowSeconds > 0 ? Math.max(5, Math.round(windowSeconds * 0.15)) : 0
+
+/** How far the signed window may fall short of the advertised one: clock skew, not policy. */
+const SKEW_TOLERANCE = (windowSeconds) => Math.min(10, Math.round(windowSeconds * 0.1))
+
 function challengeFor(sku) {
   const item = CATALOG[sku]
   const windowSeconds = WINDOW_OVERRIDE ?? item.coolingOffSeconds
+  // Stock `exact`, with the flow named in the protocol-reserved key. The scheme
+  // is not ours to invent: what this proposal changes is when settlement happens
+  // relative to the response, which §6.1 calls a payment flow.
   return {
-    scheme: 'exact-deferred',
-    network: net.key === 'mainnet' ? 'avalanche' : 'avalanche-fuji',
+    scheme: 'exact',
+    network: `eip155:${net.chain.id}`,
     chainId: net.chain.id,
     asset: net.token,
     amount: toAtomic(item.priceSgd).toString(),
     payTo: merchant.address,
     maxTimeoutSeconds: SETTLE_BY_SECONDS,
     extra: {
+      assetTransferMethod: 'eip3009',
+      paymentFlow: windowSeconds > 0 ? 'cooling-off' : undefined,
+      coolingOffSeconds: windowSeconds,
+      cancellationSafetySeconds: cancellationSafetyFor(windowSeconds),
       name: 'XSGD',
       version: '2',
-      coolingOffSeconds: windowSeconds,
       settleBySeconds: SETTLE_BY_SECONDS,
       sku,
       description: item.name,
@@ -82,8 +100,11 @@ function challengeFor(sku) {
 }
 
 /**
- * Accept an exact-deferred payment. The merchant's whole protocol obligation
- * is these checks — this function IS the reference implementation.
+ * Accept a cooling-off payment. These checks are the merchant's whole protocol
+ * obligation under the flow. This is a demo of the token mechanics, not a
+ * conforming coordinator: it has no durable outbox, no restart recovery, and no
+ * 202/status contract — see the spec's coordinator requirements for what a
+ * production implementation owes.
  */
 async function acceptPayment(sku, envelopeB64) {
   const item = CATALOG[sku]
@@ -100,10 +121,14 @@ async function acceptPayment(sku, envelopeB64) {
   if (auth.to.toLowerCase() !== merchant.address.toLowerCase()) throw new Error('payTo mismatch')
   if (auth.value !== toAtomic(item.priceSgd)) throw new Error('amount mismatch')
 
-  // 2. the cooling-off window is honoured (±45s clock tolerance)
+  // 2. the signed window matches the advertised one, within clock skew only.
+  //    A generous tolerance here would quietly sell a shorter window than the
+  //    402 promised, so it is a small fraction of the window rather than a flat
+  //    45 seconds — which on a 90s SKU used to admit half of it.
   const window = Number(auth.validAfter) - now
-  if (window < windowSeconds - 45) throw new Error(`cooling-off too short: ${window}s < ${windowSeconds}s`)
-  if (window > windowSeconds + 300) throw new Error('cooling-off implausibly long')
+  const skew = SKEW_TOLERANCE(windowSeconds)
+  if (window < windowSeconds - skew) throw new Error(`cooling-off too short: ${window}s < ${windowSeconds}s (skew allowance ${skew}s)`)
+  if (window > windowSeconds + skew) throw new Error(`cooling-off implausibly long: ${window}s > ${windowSeconds}s`)
   if (auth.validBefore <= auth.validAfter) throw new Error('validBefore <= validAfter')
 
   // 3. the signature is the payer's
@@ -315,9 +340,9 @@ const server = createServer(async (req, res) => {
         const challenge = challengeFor(sku)
         res.writeHead(402, {
           'Content-Type': 'application/json',
-          'PAYMENT-REQUIRED': Buffer.from(JSON.stringify({ x402Version: 1, accepts: [challenge] })).toString('base64'),
+          'PAYMENT-REQUIRED': Buffer.from(JSON.stringify({ x402Version: 2, accepts: [challenge] })).toString('base64'),
         })
-        return res.end(JSON.stringify({ error: 'payment required', scheme: 'exact-deferred' }))
+        return res.end(JSON.stringify({ error: 'payment required', scheme: 'exact', paymentFlow: 'cooling-off' }))
       }
       const record = await acceptPayment(sku, envelopeB64)
       return json(res, 200, {

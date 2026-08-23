@@ -1,5 +1,5 @@
 /**
- * GRACE buyer agent — the x402 client side of the exact-deferred scheme.
+ * GRACE buyer agent — the x402 client side of the cooling-off payment flow.
  *
  *   node grace/agent.mjs --sku tee-agentix
  *   node grace/agent.mjs --sku coffee-beans --server http://localhost:4021

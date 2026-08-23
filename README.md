@@ -108,12 +108,12 @@ Cancellation being a meta-transaction matters: it is **relayable**. A phone hold
 AVAX can cancel only when a funded relayer is available and lands the payer-signed
 transaction; direct self-broadcast remains the fallback.
 
-## The protocol: `exact-deferred`, an x402 scheme extension
+## The protocol: a `cooling-off` payment flow on stock `exact`
 
 The 402 challenge gains two fields, everything else is stock x402:
 
 ```json
-{ "scheme": "exact-deferred",
+{ "scheme": "exact",
   "asset":  "0xb2F85b7AB3c2b6f62DF06dE6aE7D09c010a5096E",
   "amount": "4500000", "payTo": "<merchant>",
   "extra":  { "name": "XSGD", "version": "2",
@@ -214,7 +214,7 @@ grace/
 ├── lib/authorization.mjs  deferred-payment + cancellation signing, order-hash nonce
 ├── lib/settle.mjs         settle / cancel / simulate, revert classification
 ├── lib/brain.mjs          Bedrock purchase decision, taken before any signature exists
-├── server.mjs             merchant: x402 exact-deferred endpoint + order book + autopilot
+├── server.mjs             merchant: x402 exact/cooling-off endpoint + order book + autopilot
 ├── mission.mjs            the live screen
 ├── themes.mjs             visual themes; ?theme=<key>, ?picker=1 to compare
 ├── agent.mjs              buyer agent CLI

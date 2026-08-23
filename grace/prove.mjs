@@ -67,17 +67,39 @@ check(early.reason === REVERTS.tooEarly,
 check(early.state === 'cooling-off', 'classified as cooling-off for the UI')
 
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\n\x1b[1m2. After the window the same signature becomes cashable\x1b[0m')
+console.log('\n\x1b[1m2. Once the window has passed, the time gate is the only one that moves\x1b[0m')
 
-// Identical authorization, window already elapsed. An unfunded payer means the
-// only remaining objection the contract can raise is the balance — which proves
-// every other gate (time, nonce, signature, payee) has been passed.
+// A second authorization, signed the same way but with its window already
+// elapsed. This is NOT the first one maturing — that would take a real wait —
+// so it does not prove "the same signature later works"; it proves that with
+// the clock out of the way, an unfunded payer's only remaining objection is the
+// balance, i.e. every other gate (nonce, signature, payee) was already passing.
 const matured = await signDeferredPayment(payer, net, {
   to: merchant.address, amountSgd: 4.5, windowSeconds: -600, order,
 })
 const late = await simulateSettle(net, matured, client)
 check(late.reason === REVERTS.noFunds,
   'time gate opens; only the (empty) balance objects', late.reason, true)
+
+// And the claim the section title used to make, actually made: ONE signature,
+// refused now, accepted later. A short window keeps the wait tolerable; skip it
+// with GRACE_SKIP_WAIT=1 when you only want the fast checks.
+if (process.env.GRACE_SKIP_WAIT === '1') {
+  console.log(D('  SKIP  same-signature maturation (GRACE_SKIP_WAIT=1)'))
+} else {
+  const WAIT = 12
+  const ripening = await signDeferredPayment(payer, net, {
+    to: merchant.address, amountSgd: 4.5, windowSeconds: WAIT, order,
+  })
+  const before = await simulateSettle(net, ripening, client)
+  process.stdout.write(D(`  …waiting ${WAIT}s for that exact signature to mature`))
+  await new Promise((r) => setTimeout(r, (WAIT + 3) * 1000))
+  process.stdout.write('\r\x1b[K')
+  const after = await simulateSettle(net, ripening, client)
+  check(before.reason === REVERTS.tooEarly && after.reason !== REVERTS.tooEarly,
+    'the same signature: refused before its window, past the time gate after',
+    `${before.reason} → ${after.reason}`, true)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[1m3. Only the payee can settle — receiveWithAuthorization binds the caller\x1b[0m')
