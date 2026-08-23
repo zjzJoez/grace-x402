@@ -6,19 +6,26 @@
 > A pre-settlement intent check built from one field of EIP-3009 that everyone else
 > hardcodes to zero — no escrow, no custodian, no new contract.
 
-## For judges — the 90-second tour
+## The 90-second tour
 
-1. **The story** — <http://13.212.242.21/why> · the deadlock, the one-field
-   insight, and what each sponsor's piece does. Two-minute read.
-2. **The live rail** — <http://13.212.242.21> · a real order book on Avalanche
-   mainnet. Press *SETTLE anyway* during a window and read the token contract's
-   own refusal; open *the payer's phone* and cancel for real.
-3. **The proof** — `npm i && node grace/prove.mjs` · 15 checks, 7 of them decided
+1. **The proof** — `npm i && node grace/prove.mjs` · 15 checks, 7 of them decided
    by the deployed token itself against live mainnet state. No keys, no gas, ~20s.
-4. **The receipts** — six mainnet transactions linked below, including one
-   settled end-to-end by EventBridge with zero human involvement.
+   Start here: it needs nothing from me.
+2. **The receipts** — the mainnet transactions linked below, including one settled
+   by a scheduler with no human in the loop.
+3. **The proposal** — [`grace/specs/`](grace/specs) · the flow and its two bindings,
+   written against the x402 spec templates, under discussion in
+   [x402-foundation/x402#3182](https://github.com/x402-foundation/x402/issues/3182)
+   and [#3208](https://github.com/x402-foundation/x402/issues/3208).
+4. **The screen** — `node grace/server.mjs`, then <http://localhost:4021> · the live
+   rail runs locally. Press *SETTLE anyway* during a window and read the token
+   contract's own refusal; open the payer's page and cancel for real.
 5. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
    every frame in it is a real mainnet transaction.
+
+> The hosted demo that was at `13.212.242.21` ran on hackathon-provided AWS and went
+> away with the event. Nothing above depends on it: the proof suite talks to Avalanche
+> directly, the receipts are on-chain forever, and the screen runs on your machine.
 
 ---
 
@@ -139,9 +146,12 @@ restart recovery, an independent-authority profile for human-over-agent claims, 
 relayer, and a `cancelBy` safety margin. The EventBridge hack demo below predates those
 requirements and is not presented as a conforming coordinator.
 
-## Deployed on AWS, not drawn on a slide
+## What ran on AWS, while it ran
 
-Merchant service on **EC2** (ap-southeast-1) at <http://13.212.242.21>.
+*Hackathon-provided account, reclaimed after the event — described here because the
+mainnet transactions it produced are still verifiable, not because it is still up.*
+
+Merchant service on **EC2** (ap-southeast-1).
 
 **GRACE Autopilot** — on every accepted order the merchant creates a one-shot
 **EventBridge Scheduler** schedule at `validAfter`, which wakes a **Lambda** that
@@ -175,7 +185,7 @@ Source: [`grace/architecture.drawio`](grace/architecture.drawio)
 
 ## See it
 
-**<http://13.212.242.21>** — one live screen. The countdown sits between the two
+`node grace/server.mjs` → **<http://localhost:4021>** — one live screen. The countdown sits between the two
 parties on purpose: the same number means *"you cannot cash this"* to the merchant
 and *"you can still kill this"* to the payer. Below it, both balances carry a
 running "unchanged for" timer, because *nothing moved* is the claim and it should

@@ -1,7 +1,7 @@
 /**
  * The take: three stages, one clock.
  *
- *   node grace/video/record.mjs [--server http://13.212.242.21] [--dry]
+ *   node grace/video/record.mjs [--server http://localhost:4021] [--dry]
  *
  * Scene cuts are real page navigations — terminal, merchant screen, the payer's
  * phone, back, end card — and everything inside them is real: the terminal
@@ -23,7 +23,7 @@ import { CAPTION_CSS, CAPTION_JS, planLines } from './captions.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : d }
-const SERVER = arg('server', 'http://13.212.242.21').replace(/\/$/, '')
+const SERVER = arg('server', 'http://localhost:4021').replace(/\/$/, '')
 const OUT = join(HERE, 'capture')
 mkdirSync(OUT, { recursive: true })
 

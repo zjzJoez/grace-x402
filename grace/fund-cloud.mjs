@@ -1,7 +1,10 @@
+// RETIRED: this drove the hackathon-provided AWS instance over SSM. That account
+// was reclaimed after the event and the wallets it generated are unreachable, so
+// this script has no live target. Kept for the record of how the cloud demo ran.
 /**
  * Fund the CLOUD demo wallets from the LOCAL demo wallets.
  *
- *   node grace/fund-cloud.mjs http://13.212.242.21
+ *   node grace/fund-cloud.mjs http://localhost:4021
  *
  * The cloud instance generated its own keys at boot (they never traveled).
  * Its addresses are public via /api/orders. The local merchant wallet holds
@@ -14,7 +17,7 @@ import { pickNetwork } from './lib/xsgd.mjs'
 import { publicClientFor, walletClientFor } from './lib/settle.mjs'
 import { demoWallets } from './lib/keys.mjs'
 
-const SERVER = (process.argv[2] ?? 'http://13.212.242.21').replace(/\/$/, '')
+const SERVER = (process.argv[2] ?? 'http://localhost:4021').replace(/\/$/, '')
 const net = pickNetwork('mainnet')
 const { merchant: localMerchant } = demoWallets()
 const client = publicClientFor(net)

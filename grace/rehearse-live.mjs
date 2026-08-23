@@ -9,7 +9,7 @@ import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const SERVER = 'http://13.212.242.21'
+const SERVER = 'http://localhost:4021'
 const SHOTS = '/Users/joez/Desktop/StaritsX Hacks Project/grace/shots'
 mkdirSync(SHOTS, { recursive: true })
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))

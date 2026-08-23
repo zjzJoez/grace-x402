@@ -135,7 +135,7 @@ export function endPage() {
       <div class="r rA">AVALANCHE<span>makes 90s safe</span></div>
       <div class="r rW">AWS<span>settles on time</span></div>
     </div>
-    <div class="repo">live · <b>13.212.242.21</b> &nbsp;·&nbsp; code · <b>github.com/zjzJoez/grace-x402</b></div>
+    <div class="repo">code · <b>github.com/zjzJoez/grace-x402</b> &nbsp;·&nbsp; proof · <b>node grace/prove.mjs</b></div>
   </div>
 </body></html>`
 }

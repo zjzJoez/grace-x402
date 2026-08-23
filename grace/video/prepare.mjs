@@ -3,7 +3,7 @@
  * settle it. That settled order is the video's scene-six evidence — settled by
  * EventBridge on its own, minutes before the take.
  *
- *   node grace/video/prepare.mjs [--server http://13.212.242.21]
+ *   node grace/video/prepare.mjs [--server http://localhost:4021]
  */
 
 import { spawn, execFileSync } from 'node:child_process'
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : d }
-const SERVER = arg('server', 'http://13.212.242.21').replace(/\/$/, '')
+const SERVER = arg('server', 'http://localhost:4021').replace(/\/$/, '')
 const PROFILE = process.env.AWS_PROFILE ?? '688060218394_AdministratorAccess'
 const REGION = 'ap-southeast-1'
 const INSTANCE = 'i-0afb3e543be83b321'

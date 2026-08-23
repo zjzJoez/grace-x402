@@ -1,3 +1,6 @@
+// RETIRED: this drove the hackathon-provided AWS instance over SSM. That account
+// was reclaimed after the event and the wallets it generated are unreachable, so
+// this script has no live target. Kept for the record of how the cloud demo ran.
 /**
  * Recycle demo funds on the cloud instance: merchant -> buyer.
  *
@@ -12,7 +15,7 @@
 import { execFileSync } from 'node:child_process'
 
 const AMOUNT = process.argv[2] ?? '8'
-const SERVER = (process.argv[3] ?? 'http://13.212.242.21').replace(/\/$/, '')
+const SERVER = (process.argv[3] ?? 'http://localhost:4021').replace(/\/$/, '')
 const INSTANCE = process.env.GRACE_INSTANCE ?? 'i-0afb3e543be83b321'
 const PROFILE = process.env.AWS_PROFILE ?? '688060218394_AdministratorAccess'
 const REGION = process.env.AWS_REGION ?? 'ap-southeast-1'
