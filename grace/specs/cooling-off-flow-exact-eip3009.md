@@ -205,7 +205,8 @@ The resource server, not `/settle`, owns delayed execution:
 3. only then it returns the flow's HTTP 202 pending response;
 4. a worker wakes from durable state and observes chain time;
 5. only after observing a block with `timestamp > validAfter`, it atomically changes
-   `pending` to `settlement_submitted` and calls the ordinary synchronous `/settle`;
+   the record from a live state (`pending` or `blocked`) to `settlement_submitted` and
+   calls the ordinary synchronous `/settle`;
 6. it stores the transaction hash and waits for the settlement finality policy before
    changing the order to fulfilable.
 
@@ -345,7 +346,9 @@ The coordinator `cancelUrl` MUST:
 1. load a previously verified `paymentId` and compare every supplied field with it;
 2. verify or simulate the CancelAuthorization signature under the stored token domain,
    including ERC-1271 semantics when applicable;
-3. atomically change `pending` to `cancel_requested` before acknowledging acceptance;
+3. atomically change the record from a live state (`pending` or `blocked`) to
+   `cancel_requested` before acknowledging acceptance — a payer whose balance is short
+   is precisely the one who needs the outstanding capability killed;
 4. stop its settlement job and either broadcast itself or forward to a registered relay;
    and
 5. report `canceled` only after `AuthorizationCanceled` meets finality.
@@ -438,7 +441,8 @@ only cryptographic terminal fact is a finalized `AuthorizationCanceled` event be
 The coordinator MUST NOT use its wall clock alone. It waits until it observes a chain
 head whose timestamp is strictly greater than `validAfter`, then:
 
-1. verifies the database state is still `pending` using compare-and-set;
+1. verifies the database state is still live (`pending` or `blocked`) using
+   compare-and-set, and that no cancellation has been accepted;
 2. re-reads `authorizationState` and payer balance;
 3. broadcasts settlement through synchronous `/settle`; and
 4. waits for the advertised settlement finality before fulfilment.

@@ -149,15 +149,16 @@ checks are indicative only (funds stay with the payer during the window).
 ## Settlement
 
 Unchanged call — `x402ExactPermit2Proxy.settle(...)` — scheduled at
-`validAfter + buffer`, submitted before `deadline`. Terminal outcomes:
+`validAfter + buffer`, submitted before `deadline`. Settlement outcomes — only the
+first three are terminal:
 
 | Outcome | Signal | Report |
 | :-- | :-- | :-- |
 | Settled | transfer executed via proxy | success |
 | Client cancelled | `InvalidNonce` revert **plus** ordered evidence the bit went 0→1 by invalidation before any successful use | terminal `canceled_by_client` — not an error |
 | Nonce occupied, cause unproven | `InvalidNonce` revert without that evidence | `nonce_unavailable` — MUST NOT be reported as `canceled` |
-| Broadcast too early | `PaymentTooEarly()` | facilitator scheduling defect |
-| Missed deadline | Permit2 `SignatureExpired` | facilitator scheduling defect |
+| Broadcast too early | `PaymentTooEarly()` | not an outcome — the record stays live; a facilitator scheduling defect |
+| Missed deadline | Permit2 `SignatureExpired` | terminal `expired` — and a facilitator scheduling defect |
 | Payer spent funds / revoked Permit2 approval | ERC-20 / allowance revert | **`blocked`, not terminal** — the balance can return and the approval can be re-granted, and the proxy is a public entrypoint, so the capability stays live until `deadline`. Keep reconciling; do not release the payer. |
 
 The race, cutoff, and confirmation rules of the flow document apply unchanged; the

@@ -132,13 +132,23 @@ The minimum state machine is:
 ### `failed` is narrower than it looks
 
 A state is terminal only when the signed capability can never execute again. That is a
-property of the authorization, not of the coordinator's mood or its retry counter. A
-resource server MAY declare `failed` only on:
+property of the authorization, not of the coordinator's mood or its retry counter.
 
-- the deadline having passed (which is `expired`);
-- a cancellation that meets the binding's finality policy;
-- a settlement that already succeeded (which is `settled`); or
-- an immutable defect in the payload itself — malformed, wrong payee, bad signature.
+Three of the terminal states are reached by their own evidence: `expired` by the clock,
+`canceled` by a finalized cancellation, `settled` by a settlement. `failed` covers only
+what is left — the payload can never execute *as a payment to this payee*, because it is
+defective in a way no later event can repair:
+
+- it does not decode, or its signature does not recover to the stated payer;
+- its EIP-712 domain does not match the deployed asset; or
+- the ledger slot it needs is provably consumed and cannot be attributed — the Permit2
+  `nonce_unavailable` case, where the bit is set but ordering cannot establish whether
+  settlement or invalidation set it. The capability is dead either way; only the reason
+  is unknown, so it is terminal but MUST NOT be reported as `canceled`.
+
+A payload naming the wrong payee is not on this list. It is not defective — it is
+someone else's valid authorization, and it stays executable — so it is refused at
+`/verify` and never becomes a record at all.
 
 Everything else is `blocked`, and `blocked` is **not** terminal:
 
@@ -162,16 +172,32 @@ the capability remains executable. A coordinator that wants to abandon an order 
 its deadline MUST first obtain a cancellation that meets the finality policy, or wait
 for expiry; it MUST NOT promise terminal failure it cannot enforce.
 
-The transition from `pending` to either `cancel_requested` or
-`settlement_submitted` MUST use an atomic compare-and-set. Once cancellation is durably
-accepted, the coordinator MUST NOT initiate settlement for that record. If a settlement
-transaction is already in flight, the response MUST say the outcome is raceable rather
-than claim cancellation.
+`pending` and `blocked` are the two *live* states: the authorization is executable, or
+will be, and neither the ledger nor the payer has decided anything yet. They differ only
+in whether the coordinator currently has a reason to hold off. Transitions between them
+are ordinary — `pending → blocked` when settlement cannot proceed, `blocked → pending`
+as soon as the condition clears — and a `blocked` record MUST be re-attempted while
+`validBefore` is still ahead.
+
+**The transition into either `cancel_requested` or `settlement_submitted` MUST use an
+atomic compare-and-set from the set of live states**, not from `pending` alone. That
+single arbitration point is what makes settlement and cancellation mutually exclusive,
+and scoping it to one state would let a `blocked` record be settled and cancelled at
+once — or, worse, neither. Once cancellation is durably accepted, the coordinator MUST
+NOT initiate settlement for that record. If a settlement transaction is already in
+flight, the response MUST say the outcome is raceable rather than claim cancellation.
+
+A payer MAY cancel a `blocked` record, and this is the case where cancelling matters
+most: a payer who cannot fund the payment wants the outstanding capability dead rather
+than hanging over them until `validBefore`. A binding whose cancel endpoint accepts only
+`pending` is non-conformant.
 
 On startup and periodically, the coordinator MUST scan non-terminal records:
 
 - finish or safely abandon `preparing` records using idempotent relay registration;
 - re-arm `pending` records whose job is absent;
+- re-test `blocked` records and return them to `pending` once the condition clears,
+  for as long as settlement could still land before `validBefore`;
 - rebroadcast or continue tracking `cancel_requested` according to relay policy;
 - reconcile receipts and ledger events for submitted transactions;
 - handle a dropped/replaced/reorganized transaction without fulfilling early; and
@@ -202,7 +228,7 @@ The decoded `SettleResponse` is:
 ```json
 {
   "success": false,
-  "errorReason": "settlement_pending",
+  "errorReason": "deferred_until",
   "transaction": "",
   "network": "eip155:43114",
   "payer": "0x855A...F424",
@@ -228,8 +254,12 @@ The decoded `SettleResponse` is:
 ```
 
 [x402-foundation/x402#3208](https://github.com/x402-foundation/x402/issues/3208) proposes
-the transport-neutral vocabulary this flow actually wants — `settled` / `pending` /
-`deferred_until(T)` / `canceled(by)` — as an additive evolution of `SettleResponse`.
+the transport-neutral vocabulary this flow actually wants. As amended in that thread:
+`settled` / `pending` (post-broadcast only) / `deferred_until(T, basis)` / `canceled(by)`
+/ `expired`, as an additive evolution of `SettleResponse`. This flow additionally needs
+a non-terminal way to say "live but not progressing" — the `blocked` state below — which
+maps to none of those five, and is offered to that thread as a sixth rather than smuggled
+into `pending`.
 Two properties of that vocabulary matter to this flow specifically, and bindings MUST
 supply them: `settled` carries the settlement timestamp, and `canceled` carries a
 **revocation reference** so the terminal state is re-derivable from the ledger rather
@@ -240,11 +270,19 @@ Under the Permit2 binding a bare `UnorderedNonceInvalidation` event does **not**
 that binding for why — so a binding MUST define its anchors together with the ordering
 evidence that makes them conclusive, and MUST report ambiguity rather than assert
 `canceled` when it cannot.
-Until #3208 lands, this flow maps onto today's fields as follows.
+This flow depends on that vocabulary and MUST NOT be read as adopting today's fields
+unchanged. In particular it MUST NOT reuse `settlement_pending` for its pre-settlement
+response: §5.3 and §9 require a non-empty `transaction` with that reason, because
+#3083 defined it to mean "broadcast, confirmation unknown". A payment that has not been
+broadcast has no hash to name, so the pre-broadcast state needs a reason of its own —
+written here as `deferred_until`, pending whatever #3208 settles on.
 
-For a recognized flow, `settlement_pending` is non-terminal; `success: false` truthfully
-states that settlement has not succeeded. A pending response MUST NOT use `success:
-true` or invent a transaction hash.
+That is a real dependency, not a stylistic one: until a non-terminal reason exists that
+does not imply a broadcast, this flow cannot answer truthfully at all, which is why
+#3208 should land first.
+
+Whatever the reason code, a pending response MUST NOT use `success: true` and MUST NOT
+invent a transaction hash.
 
 An unaware client is protected by verification, not by selection behaviour. Stock
 clients typically match an `accepts[]` entry on scheme and network and MAY select this
@@ -255,14 +293,14 @@ rather than admitting a payment with no cooling-off period. The safety property 
 from verify.
 
 `GET statusUrl` MUST be safe, idempotent, and return the same `SettleResponse` as JSON
-and in `PAYMENT-RESPONSE`. Terminal mappings are:
+and in `PAYMENT-RESPONSE`. State mappings are:
 
 | State | `success` | `errorReason` | `transaction` |
 | :-- | :--: | :-- | :-- |
 | `settled` | `true` | omitted | settlement hash |
 | `canceled` | `false` | `canceled_by_client` | cancellation hash |
 | `failed` | `false` | specific stable reason | hash if one exists, otherwise empty |
-| `blocked` | `false` | specific stable reason | empty — **non-terminal**, the record remains under reconciliation |
+| `blocked` | `false` | specific stable reason, distinguishable from any terminal one | the broadcast hash if the record has one, otherwise empty |
 | `expired` | `false` | `authorization_expired` | empty |
 
 Status and cancellation URLs MUST be unguessable or separately access-controlled, use
