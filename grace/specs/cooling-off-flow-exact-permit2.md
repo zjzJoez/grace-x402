@@ -50,12 +50,33 @@ Measured on Base mainnet (2026-08-19): `invalidateUnorderedNonces(0, 1)` estimat
 | Cancel authorization | payer-signed meta-tx — **any relayer may broadcast**; payer needs no native gas (relay availability caveats apply) | **payer's own transaction** — ~46k gas, payer MUST hold native currency on the chain |
 | Token coverage | EIP-3009 tokens (USDC, XSGD, EURC, FiatToken derivatives) | **any ERC-20** (one-time Permit2 approval prerequisite, as in stock `exact`/`permit2`) |
 | Window enforcement | token contract (`authorization is not yet valid`) | `x402ExactPermit2Proxy` (`PaymentTooEarly`), validAfter signature-bound via the Witness |
-| Cancel finality signal | `AuthorizationCanceled` event | `UnorderedNonceInvalidation` event |
+| Cancel finality signal | `AuthorizationCanceled` — conclusive on its own | `UnorderedNonceInvalidation` — **not conclusive on its own**, see [Cancellation evidence](#cancellation-evidence-is-not-the-event-alone) |
 
 A wallet that cannot fund ~46k gas has no working veto under this binding. Resource
 servers targeting the `principal-protected` authority profile SHOULD prefer the
 EIP-3009 binding or verify the payer's gas balance covers a cancellation at acceptance
 time; clients SHOULD warn when the payer's native balance cannot fund a cancel.
+
+### Cancellation evidence is not the event alone
+
+`invalidateUnorderedNonces` writes `bitmap |= mask` unconditionally and emits
+`UnorderedNonceInvalidation` **even when the bit was already set by a successful
+settlement**. `_useUnorderedNonce` reads the same bitmap, so its `InvalidNonce` revert
+means "used or invalidated" and cannot distinguish the two. A payer can therefore emit
+an invalidation event *after* being settled, and an observer reading only events would
+record a cancellation that never prevented anything.
+
+A facilitator MUST NOT map an invalidation event to `canceled`. Reporting `canceled`
+requires ordered evidence that the bit transitioned 0→1 **by invalidation, before any
+successful use** — pre-state plus transaction/log ordering, a trace, or an indexer
+attesting to both. Where a matching proxy settlement succeeded first, the state is
+`settled`. Where the nonce is occupied and the cause cannot be established, the honest
+report is `nonce_unavailable`, never `canceled`.
+
+This is a real asymmetry with the EIP-3009 binding, where `AuthorizationCanceled` is
+emitted only by a successful cancellation of an unused nonce and is therefore
+conclusive by itself. A deployment that needs self-evident, trustless cancellation
+receipts should prefer the EIP-3009 binding.
 
 ## PaymentRequirements
 
@@ -133,7 +154,8 @@ Unchanged call — `x402ExactPermit2Proxy.settle(...)` — scheduled at
 | Outcome | Signal | Report |
 | :-- | :-- | :-- |
 | Settled | transfer executed via proxy | success |
-| Client cancelled | Permit2 `InvalidNonce` revert; `UnorderedNonceInvalidation(payer, wordPos, mask)` observed | terminal `canceled_by_client` — not an error |
+| Client cancelled | `InvalidNonce` revert **plus** ordered evidence the bit went 0→1 by invalidation before any successful use | terminal `canceled_by_client` — not an error |
+| Nonce occupied, cause unproven | `InvalidNonce` revert without that evidence | `nonce_unavailable` — MUST NOT be reported as `canceled` |
 | Broadcast too early | `PaymentTooEarly()` | facilitator scheduling defect |
 | Missed deadline | Permit2 `SignatureExpired` | facilitator scheduling defect |
 | Payer spent funds / revoked Permit2 approval | ERC-20 / allowance revert | failure; lost sale, never a lost good |

@@ -197,8 +197,13 @@ the transport-neutral vocabulary this flow actually wants — `settled` / `pendi
 Two properties of that vocabulary matter to this flow specifically, and bindings MUST
 supply them: `settled` carries the settlement timestamp, and `canceled` carries a
 **revocation reference** so the terminal state is re-derivable from the ledger rather
-than taken on the facilitator's word — the `AuthorizationCanceled` transaction under the
-EIP-3009 binding, the `UnorderedNonceInvalidation` event under the Permit2 binding.
+than taken on the facilitator's word. An anchor MUST actually prove the state it is
+offered for: under the EIP-3009 binding the `AuthorizationCanceled` transaction does,
+because the contract emits it only on a successful cancellation of an unused nonce.
+Under the Permit2 binding a bare `UnorderedNonceInvalidation` event does **not** — see
+that binding for why — so a binding MUST define its anchors together with the ordering
+evidence that makes them conclusive, and MUST report ambiguity rather than assert
+`canceled` when it cannot.
 Until #3208 lands, this flow maps onto today's fields as follows.
 
 For a recognized flow, `settlement_pending` is non-terminal; `success: false` truthfully
