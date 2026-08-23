@@ -471,6 +471,26 @@ classify settled versus canceled.
 | Relayer | discoverable, funded, idempotent record-bound cancellation API with explicit availability errors |
 | Token/chain | no change, but deployed capability must be verified |
 
+## The rejection this binding asks to be gated
+
+The change requested of `/verify` is not hypothetical. Two live public
+facilitators were sent two `exact` / `eip3009` payloads on Avalanche C-Chain,
+signed by the same funded wallet, for the same amount, to the same payee, with
+one field different (`node grace/facilitator-probe.mjs`, 2026-08-23):
+
+| `validAfter` | `facilitator.payai.network` | `x402.dexter.cash` |
+| :-- | :-- | :-- |
+| `now − 600` (what SDKs send today) | `isValid: true` | `isValid: true` |
+| `now + 90` (what this flow needs) | `invalid_exact_evm_payload_authorization_valid_after` | `invalid_exact_evm_payload_authorization_valid_after` |
+
+Both reject on the window alone, with the reference implementation's canonical
+identifier (`ErrValidAfterInFuture`). Nothing was settled — `/verify` is
+read-only — and the probe is reproducible by anyone with a funded wallet.
+
+This is the precise, and only, behaviour the binding asks to be made
+flow-conditional: unchanged for `exact`, relaxed when `paymentFlow` is
+`cooling-off`.
+
 ## Evidence and limits
 
 The GRACE repository includes live Avalanche C-Chain XSGD evidence for:

@@ -11,16 +11,21 @@
 1. **The proof** — `npm i && node grace/prove.mjs` · 15 checks, 7 of them decided
    by the deployed token itself against live mainnet state. No keys, no gas, ~20s.
    Start here: it needs nothing from me.
-2. **The receipts** — the mainnet transactions linked below, including one settled
+2. **The gap, reproduced** — `node grace/facilitator-probe.mjs` · sends two payloads
+   to two live public facilitators, identical but for `validAfter`. The backdated one
+   is accepted; the future-dated one is refused with
+   `invalid_exact_evm_payload_authorization_valid_after`. That refusal is the thing
+   the proposal exists to change, tested rather than asserted.
+3. **The receipts** — the mainnet transactions linked below, including one settled
    by a scheduler with no human in the loop.
-3. **The proposal** — [`grace/specs/`](grace/specs) · the flow and its two bindings,
+4. **The proposal** — [`grace/specs/`](grace/specs) · the flow and its two bindings,
    written against the x402 spec templates, under discussion in
    [x402-foundation/x402#3182](https://github.com/x402-foundation/x402/issues/3182)
    and [#3208](https://github.com/x402-foundation/x402/issues/3208).
-4. **The screen** — `node grace/server.mjs`, then <http://localhost:4021> · the live
+5. **The screen** — `node grace/server.mjs`, then <http://localhost:4021> · the live
    rail runs locally. Press *SETTLE anyway* during a window and read the token
    contract's own refusal; open the payer's page and cancel for real.
-5. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
+6. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
    every frame in it is a real mainnet transaction.
 
 > The hosted demo that was at `13.212.242.21` ran on hackathon-provided AWS and went
