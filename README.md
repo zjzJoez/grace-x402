@@ -13,8 +13,8 @@
 2. **The live rail** — <http://13.212.242.21> · a real order book on Avalanche
    mainnet. Press *SETTLE anyway* during a window and read the token contract's
    own refusal; open *the payer's phone* and cancel for real.
-3. **The proof** — `npm i && node grace/prove.mjs` · 13 adversarial checks
-   against live mainnet state. No keys, no gas, ~20 seconds.
+3. **The proof** — `npm i && node grace/prove.mjs` · 15 checks, 7 of them decided
+   by the deployed token itself against live mainnet state. No keys, no gas, ~20s.
 4. **The receipts** — six mainnet transactions linked below, including one
    settled end-to-end by EventBridge with zero human involvement.
 5. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
@@ -77,7 +77,7 @@ Set it to the near future instead and a dormant field becomes a cooling-off rail
 ```
 validAfter  = now + coolingOffSeconds   ← until then, the CHAIN refuses settlement
 validBefore = validAfter + settleBy     ← after that, the claim lapses on its own
-nonce       = keccak256(order)          ← settlement events commit to what was bought
+nonce       = keccak256(order‖salt)     ← settlement events commit to what was bought
 ```
 
 During the window the merchant holds a signed, amount-locked, payer-bound claim
@@ -127,9 +127,11 @@ Full loop executed on Avalanche C-Chain (43114) against live XSGD:
 | settle after cancel | reverts forever: `FiatTokenV2: authorization is used or canceled` |
 | un-cancelled order settles | [`receiveWithAuthorization` tx](https://snowtrace.io/tx/0xf6ccdc44fdc93ad3bc46242f41f9e636cad43c90e5202f2e89fee73525c593db) — S$4.50 settled, final |
 
-Plus `prove.mjs`: 13 adversarial checks (payee binding, forged-cancel rejection,
-burned-nonce replay, order-hash commitment …) — all passing against live mainnet
-state, no contract deployed, no gas spent.
+Plus `prove.mjs`: 15 checks, of which 7 are answered by the deployed contract via
+`eth_call` (payee binding, forged-cancel rejection, burned-nonce replay, the window
+gate itself) and the rest are local properties of the commitment. No contract
+deployed, no gas spent. The suite prints the split rather than counting them as one
+number.
 
 These checks prove token mechanics, not a production asynchronous protocol. The
 production proposal requires a durable coordinator, HTTP 202/status/cancel semantics,
@@ -183,7 +185,7 @@ be measured rather than asserted.
 
 ```bash
 npm i                                   # viem only
-node grace/prove.mjs                    # 13 mainnet proofs — no keys, no gas, ~20s
+node grace/prove.mjs                    # 15 checks, 7 decided on mainnet — no keys, no gas
 node grace/server.mjs                   # merchant → http://localhost:4021
 node grace/agent.mjs --sku tee-agentix --server http://localhost:4021 [--brain]
 ```
