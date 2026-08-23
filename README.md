@@ -12,8 +12,10 @@
    by the deployed token itself against live mainnet state. No keys, no gas.
    Start here: it needs nothing from me.
 2. **The gap, reproduced** — `node grace/facilitator-probe.mjs` · sends two payloads
-   to two live public facilitators, identical but for `validAfter`. The backdated one
-   is accepted; the future-dated one is refused with
+   to two live public facilitators, identical but for `validAfter`. Needs a signing key
+   at `grace/.keys.json`; an unfunded one still reproduces the refusal, a funded one
+   also gets the control accepted. The backdated payload is accepted; the future-dated
+   one is refused with
    `invalid_exact_evm_payload_authorization_valid_after`. That refusal is the thing
    the proposal exists to change, tested rather than asserted.
 3. **The receipts** — the mainnet transactions linked below, including one settled
@@ -47,9 +49,12 @@ chain's verdict:
 
 ![Merchant screen during the cooling-off window — claim held, settlement chain-blocked](grace/shots/merchant-cooling.jpg)
 
-**The payer keeps the last word in this demo.** `/pay/latest` on the separately
-controlled payer wallet signs `cancelAuthorization`; the configured demo relayer pays
-the gas, and the nonce is burned on-chain forever:
+**The payer keeps the last word in this demo.** The payer's page — reachable only
+through the link in the payment receipt — asks the server to sign
+`cancelAuthorization` with the demo buyer key it holds, and the configured relayer pays
+the gas. In a real deployment the payer's own wallet signs and the server only relays;
+that separation is what the spec's `principal-protected` profile requires and what this
+demo does **not** implement:
 
 <p align="center">
   <img src="grace/shots/phone-pending.jpg" width="38%" alt="Payer's phone — countdown and CANCEL, costs nothing" />
@@ -205,8 +210,11 @@ node grace/server.mjs                   # merchant → http://localhost:4021
 node grace/agent.mjs --sku tee-agentix --server http://localhost:4021 [--brain]
 ```
 
-`prove.mjs` is the one to run if you only run one: it asserts every claim in this
-README against live Avalanche mainnet state, from a throwaway key, spending nothing.
+`prove.mjs` is the one to run if you only run one — but be precise about its scope: it
+asserts the **token mechanics** and the local commitment properties against live
+Avalanche mainnet state, from a throwaway key, spending nothing. It does not exercise
+the server, a facilitator, or a real cancellation broadcast; `facilitator-probe.mjs`
+covers the first of those.
 
 ```
 grace/

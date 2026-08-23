@@ -109,7 +109,7 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
     if(state==='cooling-off'){active=2}
     else if(state==='settleable'||state==='insufficient'){active=3}
     else if(state==='settled'){fin=true;active=4}
-    else if(state==='voided'||state==='void'){kill=true;active=2}
+    else if(state==='canceled'){kill=true;active=2}
     $('rail').innerHTML=STEPS.map((s,i)=>{
       let c='step';
       if(fin&&i<=4)c+=' fin';
@@ -189,8 +189,8 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       $('mQuote').style.display='block'; $('mQuote').className='quote';
       $('mSaid').textContent='"'+(o.live.reason||'…')+'"';
       $('ringCap').innerHTML='the same number means<br><b>"not yet yours"</b> to the merchant<br>and <b>"still yours"</b> to the payer';
-    } else if(st==='voided'||st==='void'){
-      $('ringNum').textContent='✕'; $('ringLbl').textContent='voided';
+    } else if(st==='canceled'){
+      $('ringNum').textContent='✕'; $('ringLbl').textContent='cancelled';
       $('arc').setAttribute('stroke',ARC.void); $('arc').style.strokeDashoffset=0;
       $('mVerdict').innerHTML='<span class="cant">this claim is dead forever</span>';
       $('pVerdict').innerHTML='<span class="can">vetoed · balance never moved</span>';

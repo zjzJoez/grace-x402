@@ -164,7 +164,11 @@ export const REVERTS = {
   expired: 'FiatTokenV2: authorization is expired',
   spent: 'FiatTokenV2: authorization is used or canceled',
   wrongCaller: 'FiatTokenV2: caller must be the payee',
-  badSig: 'EIP712: invalid signature',
+  // Measured, not assumed: a well-formed signature over a different message
+  // reverts with this. `EIP712: invalid signature` was in here for weeks and the
+  // deployed contract never emits it — in a file whose header claims everything
+  // was read off the live contracts.
+  badSig: 'FiatTokenV2: invalid signature',
   noFunds: 'ERC20: transfer amount exceeds balance',
 }
 

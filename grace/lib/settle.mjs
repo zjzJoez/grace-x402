@@ -36,6 +36,22 @@ export async function balanceOf(net, address, client = publicClientFor(net)) {
 }
 
 /** Pull the bare revert reason out of viem's (very verbose) error object. */
+/**
+ * Did the contract answer, or did we never reach it? A DNS failure and a
+ * signature rejection both throw, and treating them alike lets a network
+ * outage impersonate a security property — a forged-cancellation check that
+ * "passes" because the RPC was down has proven nothing.
+ */
+export function isContractVerdict(err) {
+  const hay = [err?.shortMessage, err?.details, err?.metaMessages?.join(' '), err?.message]
+    .filter(Boolean).join('\n')
+  if (Object.values(REVERTS).some((r) => hay.includes(r))) return true
+  if (/reverted|execution reverted|revert reason/i.test(hay)) return true
+  // viem's transport-layer errors: nothing on chain was consulted.
+  if (/HTTP request failed|fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|timed out|socket hang up|network|rate limit/i.test(hay)) return false
+  return false // unknown shape: refuse to call it a verdict
+}
+
 export function revertReason(err) {
   const hay = [err?.shortMessage, err?.details, err?.metaMessages?.join(' '), err?.message]
     .filter(Boolean).join('\n')
@@ -54,7 +70,15 @@ export function classify(reason) {
     return { state: 'cooling-off', headline: 'Cannot settle yet', detail: 'The cooling-off window has not closed. The chain is enforcing this, not the merchant.' }
   }
   if (reason === REVERTS.spent) {
-    return { state: 'void', headline: 'Authorization void', detail: 'The payer cancelled during the cooling-off window. The nonce is burned on-chain and can never be settled.' }
+    // "authorization is used or canceled" is exactly that: the contract does not
+    // say which. A settled payment and a cancelled one leave the same revert and
+    // the same authorizationState, so claiming "the payer cancelled" here would
+    // report a completed sale as a refusal. Only the events can tell them apart.
+    return {
+      state: 'nonce_unavailable',
+      headline: 'Nonce consumed',
+      detail: 'Settled or cancelled — the revert cannot distinguish them. Read AuthorizationUsed / AuthorizationCanceled to attribute it.',
+    }
   }
   if (reason === REVERTS.expired) {
     return { state: 'expired', headline: 'Authorization expired', detail: 'The merchant did not settle before validBefore. The claim lapsed on its own.' }
@@ -79,10 +103,11 @@ export async function simulateSettle(net, { authorization, v, r, s }, client = p
       args: argsFor(authorization, { v, r, s }),
       account: authorization.to,
     })
-    return { ok: true, reason: null, ...classify(null), state: 'settleable', headline: 'Ready to settle' }
+    return { ok: true, reason: null, reached: true, ...classify(null), state: 'settleable', headline: 'Ready to settle' }
   } catch (err) {
     const reason = revertReason(err)
-    return { ok: false, reason, ...classify(reason) }
+    const reached = isContractVerdict(err)
+    return { ok: false, reason, reached, ...(reached ? classify(reason) : { state: 'unreachable', headline: 'Chain not reached', detail: reason }) }
   }
 }
 
@@ -126,8 +151,9 @@ export async function simulateCancel(net, relayerAddress, { message, v, r, s }, 
       args: [message.authorizer, message.nonce, v, r, s],
       account: relayerAddress,
     })
-    return { ok: true, reason: null }
+    return { ok: true, reason: null, reached: true }
   } catch (err) {
-    return { ok: false, reason: revertReason(err) }
+    const reached = isContractVerdict(err)
+    return { ok: false, reason: revertReason(err), reached }
   }
 }

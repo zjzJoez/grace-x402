@@ -66,10 +66,16 @@ const persist = () => writeFileSync(ORDERS_PATH, JSON.stringify([...orders.value
  * margin" is conformant and dishonest, which is the case the spec now forbids.
  */
 const cancellationSafetyFor = (windowSeconds) =>
-  windowSeconds > 0 ? Math.max(5, Math.round(windowSeconds * 0.15)) : 0
+  // The spec caps this at a quarter of the window. A flat 5s floor breaks that
+  // on short windows (5 of 19 is 26.3%), so the cap wins and a window too short
+  // to carry any margin gets none.
+  windowSeconds > 0 ? Math.min(Math.max(5, Math.round(windowSeconds * 0.15)), Math.floor(windowSeconds / 4)) : 0
 
-/** How far the signed window may fall short of the advertised one: clock skew, not policy. */
-const SKEW_TOLERANCE = (windowSeconds) => Math.min(10, Math.round(windowSeconds * 0.1))
+/** How far the signed window may differ from the advertised one: clock skew, not policy. */
+const SKEW_TOLERANCE = (windowSeconds) => Math.max(2, Math.min(10, Math.round(windowSeconds * 0.1)))
+
+/** How long a quote may sit unsigned. Without this an unsigned 402 is a free price option. */
+const QUOTE_TTL_SECONDS = 120
 
 function challengeFor(sku) {
   const item = CATALOG[sku]
@@ -90,6 +96,7 @@ function challengeFor(sku) {
       paymentFlow: windowSeconds > 0 ? 'cooling-off' : undefined,
       coolingOffSeconds: windowSeconds,
       cancellationSafetySeconds: cancellationSafetyFor(windowSeconds),
+      quoteExpiresAt: Math.floor(Date.now() / 1000) + QUOTE_TTL_SECONDS,
       name: 'XSGD',
       version: '2',
       settleBySeconds: SETTLE_BY_SECONDS,
@@ -131,6 +138,19 @@ async function acceptPayment(sku, envelopeB64) {
   if (window > windowSeconds + skew) throw new Error(`cooling-off implausibly long: ${window}s > ${windowSeconds}s`)
   if (auth.validBefore <= auth.validAfter) throw new Error('validBefore <= validAfter')
 
+  // 2b. the quote the client signed against is still the quote we are offering.
+  //     Signing time is the client's to choose, so without an expiry a held 402
+  //     is a free option on the price for as long as the client likes.
+  const quoteExpiresAt = Number(accepted?.extra?.quoteExpiresAt ?? 0)
+  if (!quoteExpiresAt) throw new Error('quote has no expiry — refusing to honour an open-ended price')
+  if (now > quoteExpiresAt) throw new Error(`quote expired ${now - quoteExpiresAt}s ago — request a fresh 402`)
+
+  // 2c. the safety margin the client was shown obeys the spec's floor.
+  const safety = Number(accepted?.extra?.cancellationSafetySeconds ?? -1)
+  if (windowSeconds > 0 && !(safety >= 0 && safety <= Math.floor(windowSeconds / 4))) {
+    throw new Error(`cancellation safety margin ${safety}s exceeds a quarter of the ${windowSeconds}s window`)
+  }
+
   // 3. the signature is the payer's
   const signer = await recoverTypedDataAddress({
     domain: domainFor(net),
@@ -168,6 +188,7 @@ async function acceptPayment(sku, envelopeB64) {
     status: 'pending', // pending -> settled | voided | expired
     createdAt: now,
     opensAt: Number(auth.validAfter),
+    cancelBy: Number(auth.validAfter) - cancellationSafetyFor(windowSeconds),
     closesAt: Number(auth.validBefore),
     windowSeconds,
     order,
@@ -252,8 +273,8 @@ async function blockNumber() {
 // ── live chain state per order ───────────────────────────────────────────────
 const simCache = new Map() // id -> { at, result }
 async function liveState(o) {
-  if (o.status === 'settled' || o.status === 'voided') {
-    return { state: o.status, headline: o.status === 'settled' ? 'Settled on-chain' : 'Voided by payer', detail: '', reason: null }
+  if (o.status === 'settled' || o.status === 'canceled') {
+    return { state: o.status, headline: o.status === 'settled' ? 'Settled on-chain' : 'Cancelled by payer', detail: '', reason: null }
   }
   const cached = simCache.get(o.id)
   if (cached && Date.now() - cached.at < 3000) return cached.result
@@ -268,13 +289,32 @@ async function liveState(o) {
   return result
 }
 
+/**
+ * What a public reader is allowed to see. An allowlist, not a blocklist: the
+ * record holds a signed authorization, and that payload is a bearer settlement
+ * capability — anyone who copies it can submit the payment. Spreading the record
+ * and deleting one field is how `signature`, `authorization`, `order` and
+ * `orderSalt` were being served to anonymous callers on three endpoints.
+ */
 async function orderView(o) {
   const now = Math.floor(Date.now() / 1000)
-  const { cancelToken, ...visible } = o
   return {
-    ...visible,
+    id: o.id,
+    sku: o.sku,
+    name: o.name,
+    amountSgd: o.amountSgd,
+    status: o.status,
+    createdAt: o.createdAt,
+    opensAt: o.opensAt,
+    cancelBy: o.cancelBy,
+    closesAt: o.closesAt,
+    windowSeconds: o.windowSeconds,
+    payer: o.payer,
+    nonce: o.authorization?.nonce,   // public on-chain anyway; the commitment is salted
+    txs: o.txs,
     live: await liveState(o),
     secondsLeft: Math.max(0, o.opensAt - now),
+    cancelSecondsLeft: Math.max(0, (o.cancelBy ?? o.opensAt) - now),
     explorer: net.explorer,
   }
 }
@@ -305,7 +345,7 @@ async function doCancel(o) {
   // and never needs any — that is the point being demonstrated.
   const cancellation = await signCancellation(buyer, net, o.authorization.nonce)
   const res = await broadcastCancel(net, relayer, cancellation)
-  o.status = 'voided'
+  o.status = 'canceled'
   o.txs.cancel = res.hash
   persist()
   return res
@@ -441,24 +481,31 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/stage/problem') return html(res, problemPage())
     if (req.method === 'GET' && path === '/stage/terminal') return html(res, terminalPage())
     if (req.method === 'GET' && path === '/stage/end') return html(res, endPage())
+    // The recording stage: same credential rule as /pay/:id, since it frames it.
     if (req.method === 'GET' && path === '/phone') {
-      const id = url.searchParams.get('id') ?? [...orders.values()].sort((a, b) => b.createdAt - a.createdAt)[0]?.id
-      if (!id) return json(res, 404, { error: 'no orders yet' })
-      return html(res, phonePage(id, PUBLIC_URL, orders.get(id)?.cancelToken ?? ''))
+      const id = url.searchParams.get('id')
+      const o = id ? orders.get(id) : null
+      if (!o) return json(res, 404, { error: 'no such order' })
+      if (url.searchParams.get('t') !== o.cancelToken) {
+        return json(res, 403, { error: 'this page needs the payer link from the payment receipt' })
+      }
+      return html(res, phonePage(id, PUBLIC_URL, o.cancelToken))
     }
     if (req.method === 'GET' && path === '/console') return html(res, consolePage(net))
-    // The stage bookmark: a phone that opens /pay/latest always lands on the
-    // newest still-cancellable order — no typing an order id on stage. Renders
-    // in place (no redirect) so pull-to-refresh re-resolves to the next order.
-    if (req.method === 'GET' && path === '/pay/latest') {
-      const all = [...orders.values()].sort((a, b) => b.createdAt - a.createdAt)
-      const o = all.find((x) => x.status === 'pending') ?? all[0]
-      return o ? html(res, payPage(o, net)) : json(res, 404, { error: 'no orders yet' })
-    }
+    // /pay/latest is gone. It resolved the newest order for whoever asked and
+    // rendered its page — which embeds the cancellation token — so any anonymous
+    // visitor could read the credential that the cancel endpoint checks. A demo
+    // convenience that silently reopened the hole the token exists to close.
     const pay = path.match(/^\/pay\/([0-9a-f]+)$/)
     if (req.method === 'GET' && pay) {
       const o = orders.get(pay[1])
-      return o ? html(res, payPage(o, net)) : json(res, 404, { error: 'no such order' })
+      if (!o) return json(res, 404, { error: 'no such order' })
+      // The page carries the cancellation credential, so seeing the page requires
+      // holding it. The link comes from the 402 receipt, which only the payer got.
+      if (url.searchParams.get('t') !== o.cancelToken) {
+        return json(res, 403, { error: 'this page needs the payer link from the payment receipt' })
+      }
+      return html(res, payPage(o, net))
     }
     if (req.method === 'GET' && path === '/store') return html(res, storefrontPage(CATALOG, net, merchant.address))
 

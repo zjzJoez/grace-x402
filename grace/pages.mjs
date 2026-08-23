@@ -99,7 +99,7 @@ export function consolePage(net) {
         : (st === 'settleable' ? '<div class="verdict ok">chain says:<span class="reason">ready — receiveWithAuthorization will succeed</span></div>' : '');
       const txs = Object.entries(o.txs || {}).map(([k, h]) =>
         '<a class="txlink" target="_blank" href="' + o.explorer + '/tx/' + h + '">' + k + ' tx ↗</a>').join(' · ');
-      const btn = (st === 'settled' || st === 'void')
+      const btn = (st === 'settled' || st === 'nonce_unavailable' || o.status === 'canceled')
         ? '' : '<button class="settle ' + (st === 'settleable' ? '' : 'blocked') + '" onclick="doSettle(\\'' + o.id + '\\', this)">SETTLE</button>';
       return '<div class="card" id="o-' + o.id + '">' +
         '<div class="row"><div><b>' + o.name + '</b> <span class="dim">#' + o.id + '</span><br>' +
@@ -143,11 +143,12 @@ export function payPage(order, net) {
 
   const js = `
   const id = '${order.id}', opensAt = ${order.opensAt}, windowSeconds = ${order.windowSeconds};
+  const cancelBy = ${order.cancelBy ?? order.opensAt};
   const cancelToken = '${order.cancelToken ?? ''}';
   let done = false;
   function render(o) {
     const area = document.getElementById('stateArea');
-    if (o.status === 'voided') {
+    if (o.status === 'canceled') {
       done = true;
       area.innerHTML = '<div class="big-state" style="color:var(--red)">✕ CANCELLED</div>' +
         '<div class="dim">The nonce is burned on-chain — this payment can never be settled by anyone.</div>' +
@@ -162,12 +163,22 @@ export function payPage(order, net) {
         (o.txs.settle ? '<div style="margin-top:10px"><a target="_blank" href="' + o.explorer + '/tx/' + o.txs.settle + '">settlement tx ↗</a></div>' : '');
       return;
     }
-    const left = Math.max(0, opensAt - Math.floor(Date.now() / 1000));
+    // Count down to cancelBy, not to validAfter. The tail between them is
+    // inclusion-and-finality margin: a cancellation sent in there races the
+    // settlement rather than beating it, and calling that "time remaining"
+    // would sell the payer a margin that is not theirs.
+    const now = Math.floor(Date.now() / 1000);
+    const left = Math.max(0, cancelBy - now);
+    const raceable = left === 0 && now < opensAt;
     document.getElementById('count').textContent = left + 's';
-    document.getElementById('bar').style.width = (100 * left / windowSeconds) + '%';
-    if (left === 0) {
-      document.getElementById('cancelBtn').disabled = true;
-      document.getElementById('cancelBtn').textContent = 'window closed — merchant may settle';
+    document.getElementById('bar').style.width = (100 * left / Math.max(1, cancelBy - (opensAt - windowSeconds))) + '%';
+    const btn = document.getElementById('cancelBtn');
+    if (raceable) {
+      btn.textContent = 'CANCEL anyway — races the merchant now';
+      btn.style.opacity = '0.75';
+    } else if (left === 0) {
+      btn.disabled = true;
+      btn.textContent = 'window closed — merchant may settle';
     }
   }
   async function doCancel(btn) {

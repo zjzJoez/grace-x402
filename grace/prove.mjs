@@ -62,7 +62,7 @@ const pending = await signDeferredPayment(payer, net, {
 })
 
 const early = await simulateSettle(net, pending, client)
-check(early.reason === REVERTS.tooEarly,
+check(early.reached && early.reason === REVERTS.tooEarly,
   'merchant settling inside the window reverts', early.reason, true)
 check(early.state === 'cooling-off', 'classified as cooling-off for the UI')
 
@@ -78,7 +78,7 @@ const matured = await signDeferredPayment(payer, net, {
   to: merchant.address, amountSgd: 4.5, windowSeconds: -600, order,
 })
 const late = await simulateSettle(net, matured, client)
-check(late.reason === REVERTS.noFunds,
+check(late.reached && late.reason === REVERTS.noFunds,
   'time gate opens; only the (empty) balance objects', late.reason, true)
 
 // And the claim the section title used to make, actually made: ONE signature,
@@ -96,7 +96,11 @@ if (process.env.GRACE_SKIP_WAIT === '1') {
   await new Promise((r) => setTimeout(r, (WAIT + 3) * 1000))
   process.stdout.write('\r\x1b[K')
   const after = await simulateSettle(net, ripening, client)
-  check(before.reason === REVERTS.tooEarly && after.reason !== REVERTS.tooEarly,
+  // Both simulations must be contract verdicts, and the second must be the
+  // *specific* post-window objection — "not tooEarly any more" would also be
+  // satisfied by the RPC going down mid-wait.
+  check(before.reached && before.reason === REVERTS.tooEarly &&
+        after.reached && after.reason === REVERTS.noFunds,
     'the same signature: refused before its window, past the time gate after',
     `${before.reason} → ${after.reason}`, true)
 }
@@ -131,7 +135,9 @@ check(cancelSim.ok,
 const forged = await signCancellation(bystander, net, pending.authorization.nonce)
 const forgedSim = await simulateCancel(net, bystander.address,
   { message: { authorizer: payer.address, nonce: pending.authorization.nonce }, v: forged.v, r: forged.r, s: forged.s }, client)
-check(!forgedSim.ok, 'a forged cancellation is rejected', forgedSim.reason, true)
+check(!forgedSim.ok && forgedSim.reached && forgedSim.reason === REVERTS.badSig,
+  'a forged cancellation is rejected — by the contract, not by a failed request',
+  forgedSim.reason, true)
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[1m5. A spent or cancelled nonce is dead forever\x1b[0m')
@@ -179,9 +185,10 @@ if (!used) {
   replay.authorization.from = authorizer
   replay.authorization.nonce = nonce
   const dead = await simulateSettle(net, replay, client)
-  check(dead.reason === REVERTS.spent,
-    'settling a burned nonce reverts — this is what CANCEL leaves behind', dead.reason, true)
-  check(dead.state === 'void', 'classified as void for the UI')
+  check(dead.reached && dead.reason === REVERTS.spent,
+    'settling a consumed nonce reverts — replay is impossible', dead.reason, true)
+  check(dead.state === 'nonce_unavailable',
+    'a consumed nonce is reported as consumed, not as a cancellation', dead.state)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
