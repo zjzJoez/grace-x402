@@ -8,8 +8,9 @@
  * is why the flow needs to exist. This asks them, instead of asserting it.
  *
  * Two payloads go to a live public facilitator's /verify. They are signed by
- * the same wallet, for the same amount, to the same payee, with the same
- * nonce-free structure — one field differs:
+ * the same wallet, for the same amount, to the same payee, and differ only in
+ * the activation time and what mechanically follows from it — validBefore is
+ * derived from it, and each authorization needs its own nonce:
  *
  *   control    validAfter = now - 600   (what every SDK sends today)
  *   cooling    validAfter = now + 90    (what this flow needs)
@@ -18,7 +19,7 @@
  */
 
 import { privateKeyToAccount } from 'viem/accounts'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pickNetwork, domainFor, TYPES } from './lib/xsgd.mjs'
@@ -41,8 +42,23 @@ const WINDOW_ERROR = 'invalid_exact_evm_payload_authorization_valid_after'
 
 const net = pickNetwork('mainnet')
 const client = publicClientFor(net)
-const buyer = privateKeyToAccount(JSON.parse(readFileSync(join(HERE, '.keys.json'), 'utf8')).buyer)
-const payTo = '0x7a8fDE09C400325C8B1fCe870C89d3f68A26D30d'
+const KEYS = join(HERE, '.keys.json')
+if (!existsSync(KEYS)) {
+  console.error(`\nThis probe needs a funded wallet, because a facilitator checks the payer's
+balance before it gets as far as the window. Create ${KEYS}:
+
+    { "buyer": "0x<private key of a wallet holding a little XSGD on Avalanche>" }
+
+It is gitignored. The probe signs authorizations but never settles one — /verify
+is read-only — and it pays to your own address, so nothing can move even if a
+signature leaked.\n`)
+  process.exit(1)
+}
+const buyer = privateKeyToAccount(JSON.parse(readFileSync(KEYS, 'utf8')).buyer)
+// Self-payment: verification exercises the identical code path, and a leaked
+// payload can only ever pay the runner. The spec calls a signed authorization a
+// bearer capability; a probe should not mint one payable to someone else.
+const payTo = buyer.address
 const amount = toAtomic('0.10')
 
 /** A stock `exact` / eip3009 payload — the only variable is when it becomes valid. */
@@ -129,8 +145,9 @@ for (const f of FACILITATORS) {
   const control = String(seen[-600] ?? '')
   const cooling = String(seen[90] ?? '')
   if (cooling.includes(WINDOW_ERROR) && !control.includes(WINDOW_ERROR)) {
-    console.log(G(`  ⇒ the only difference between the two payloads is validAfter, and it is the`))
-    console.log(G(`    single reason this facilitator refuses the second one.\n`))
+    console.log(G(`  ⇒ the payloads differ only in the activation time and what follows from`))
+    console.log(G(`    it (validBefore, and a fresh nonce as each must have). The refusal names`))
+    console.log(G(`    validAfter, and the control passes with the same structure.\n`))
     proved++
   } else {
     console.log(D(`  ⇒ inconclusive here — control: ${control.slice(0, 60)}\n`))
