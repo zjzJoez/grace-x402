@@ -79,9 +79,11 @@ no durable recovery contract.
 
 The persisted record MUST carry at least: the payment id and commitment digest, the
 complete payload and requirements, the ledger identity `(network, asset, payer, nonce)`
-— which MUST be unique, a duplicate paid request returning the existing record — the
-three timestamps (`validAfter`, `cancelBy`, `validBefore`), state with a version for
-compare-and-set, and observed transaction hashes. The signed payload is a bearer
+— which MUST be unique; a duplicate paid request returns the existing record and MUST
+NOT enqueue another settlement — the three timestamps (`validAfter`, `cancelBy`,
+`validBefore`), state with a version for compare-and-set, retry attempts and the next
+attempt time, observed transaction hashes with their observed block, and
+created/updated timestamps. The signed payload is a bearer
 settlement capability once valid: storage, logs, backups and queues MUST be
 access-controlled, SHOULD be encrypted at rest, and `statusUrl` MUST NOT expose it.
 
@@ -159,8 +161,9 @@ reason** (written here as `deferred_until`), an empty `transaction`, and a
 This flow depends on the status vocabulary proposed in
 [x402-foundation/x402#3208](https://github.com/x402-foundation/x402/issues/3208)
 (as amended there: `settled` / post-broadcast `pending` / `deferred_until(T, basis)` /
-`canceled(by)` / `expired`; `blocked` is offered to that thread as a sixth rather than
-smuggled into `pending`). The dependency is real: `settlement_pending` MUST NOT be
+`canceled(by)` / `expired`; this flow additionally needs `blocked`, which maps to none
+of those five and belongs in that thread as a proposed sixth rather than smuggled into
+`pending`). The dependency is real: `settlement_pending` MUST NOT be
 reused for the pre-settlement response, because §5.3/§9 require a non-empty
 `transaction` with it — #3083 defined it to mean "broadcast, confirmation unknown", and
 a payment that has not been broadcast has no hash to name. Until a non-terminal reason
@@ -168,13 +171,14 @@ exists that does not imply a broadcast, this flow cannot answer truthfully — w
 why #3208 should land first. Whatever the code, a pending response MUST NOT use
 `success: true` and MUST NOT invent a transaction hash.
 
-Two anchor rules from that vocabulary are load-bearing here: `settled` carries the
-settlement timestamp, and `canceled` carries a **revocation reference** so the state is
-re-derivable from the ledger. An anchor MUST actually prove the state it is offered
-for: `AuthorizationCanceled` does (emitted only on successful cancellation of an unused
-nonce); a bare Permit2 `UnorderedNonceInvalidation` does **not** — see that binding —
-so bindings define anchors together with the ordering evidence that makes them
-conclusive, and MUST report ambiguity rather than assert `canceled`.
+Two anchor rules from that vocabulary are load-bearing here, and bindings MUST supply
+them: `settled` carries the settlement timestamp, and `canceled` carries a **revocation
+reference** so the state is re-derivable from the ledger. An anchor MUST actually prove
+the state it is offered for: `AuthorizationCanceled` does (emitted only on successful
+cancellation of an unused nonce); a bare Permit2 `UnorderedNonceInvalidation` does
+**not** — see that binding — so a binding MUST define its anchors together with the
+ordering evidence that makes them conclusive, and MUST report ambiguity rather than
+assert `canceled`.
 
 An unaware client is protected by verification, not selection: stock clients match on
 scheme and network and MAY select this entry despite the unrecognized `paymentFlow`,
@@ -187,6 +191,8 @@ and in `PAYMENT-RESPONSE`:
 | State | `success` | `errorReason` | `transaction` |
 | :-- | :--: | :-- | :-- |
 | `settled` | `true` | omitted | settlement hash |
+| `cancel_requested` | `false` | non-terminal cancel-accepted reason | empty until the cancellation lands |
+| `settlement_submitted` | `false` | post-broadcast `pending` reason | broadcast hash |
 | `canceled` | `false` | `canceled_by_client` | cancellation hash |
 | `failed` | `false` | specific stable reason | hash if one exists, else empty |
 | `blocked` | `false` | stable reason, distinguishable from any terminal one | broadcast hash if one exists, else empty |
@@ -203,9 +209,12 @@ settlement — from record-specific `relayCancelUrls` created from services adve
 before signing, which may be independently operated and cannot mutate the coordinator's
 database. Acceptance at either is **not** ledger cancellation: `202 cancel_requested` /
 `202 relay_accepted` until the binding's transaction meets finality, `200 canceled`
-only after. Relays MUST accept only payments bound to previously registered records,
-verify every field and the cancellation signature, rate-limit by payment and payer, and
-be idempotent — an open endpoint paying gas for arbitrary nonces is a gas-drain vector.
+only after. Coordinator and relay endpoints MUST return distinguishable explicit outcomes for
+invalid signature, unknown payment, already settled/canceled, late raceable requests,
+and relay unavailability — a generic error collapses the payer's veto automation. Relays
+MUST accept only payments bound to previously registered records, verify every field and
+the cancellation signature, rate-limit by payment and payer, and be idempotent — an open
+endpoint paying gas for arbitrary nonces is a gas-drain vector.
 A broadcastable signature is *relayable*, not protocol-guaranteed gasless; a
 merchant-controlled relay alone is not an independent cancellation path, because the
 merchant can withhold it. Principal-protected clients submit to `cancelUrl` first and
@@ -216,10 +225,12 @@ retain an independent broadcast path.
 The window is enforced against ledger time; the client signs with its own clock. Two
 rules stop a skewed clock from silently shrinking the human's window: verification MUST
 bound the signed activation time against the verifier's clock — rejecting a remaining
-window materially shorter or implausibly longer than advertised, with the tolerance a
-small declared fraction of the window — and MUST report a large discrepancy rather than
-accept a degraded window; and any user-facing countdown MUST derive from the absolute
-signed activation time, never from the advertised window length.
+window materially shorter or implausibly longer than advertised, within a declared
+tolerance, which SHOULD be a small fraction of the window (a flat allowance can consume
+a material share of a short window, which defeats the advertisement) — and MUST report
+a large discrepancy rather than accept a degraded window; and any user-facing countdown
+MUST derive from the absolute signed activation time, never from the advertised window
+length.
 
 ## Authority profiles and intent binding
 
@@ -250,9 +261,10 @@ application order with the ledger.
 cancellationSafetySeconds`, both the server's own parameters, so disclosure alone does
 not prevent a 90-second advertisement hiding a one-second decision.
 `cancellationSafetySeconds` MUST NOT exceed **25% of `coolingOffSeconds`** (bindings
-enforce this at verification), the effective interval MUST be advertised in the same
-`PaymentRequired` the client signs against, and any consumer-facing claim MUST quote
-the effective number.
+enforce this at verification). Advertising both constituent parameters in the same
+`PaymentRequired` the client signs against satisfies the advertisement requirement —
+with the floor in place, their difference is an honest number — and any consumer-facing
+claim MUST quote that effective number, not `coolingOffSeconds`.
 
 **A quote expires, and a cancelled quote is dead.** `PaymentRequired` MUST carry an
 absolute quote expiry (binding field `quoteExpiresAt`), and acceptance past it MUST be
@@ -276,10 +288,11 @@ funding transfer to replace), and MUST NOT describe a reversible hold as fulfilm
 
 ## Security considerations
 
-- **Race.** A cancellation request is not a cancellation. Bindings define a safety
-  cutoff and finality rule; ledger order decides once both actions are valid. No
-  no-new-contract design grants cancellation priority — deployments needing that
-  property want `auth-capture` or escrow.
+- **Race.** A cancellation request is not a cancellation. A binding MUST define a
+  safety cutoff and finality rule, and clients MUST label post-cutoff requests
+  best-effort; ledger order decides once both actions are valid. No no-new-contract
+  design grants cancellation priority — deployments needing that property want
+  `auth-capture` or escrow.
 - **Settlement timing.** The payee's discretion is bounded too: bindings require prompt
   settlement at eligibility with the delay observable, because an unbounded settlement
   window is a free timing option written by the payer.

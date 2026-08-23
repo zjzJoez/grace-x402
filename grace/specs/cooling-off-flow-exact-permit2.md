@@ -114,6 +114,11 @@ Unchanged from `exact` / `permit2` except the witness derivation:
 The client MUST persist the nonce (and derived `wordPos`/`mask`) wherever the human's
 cancellation affordance lives, so the veto does not depend on the agent process.
 
+`cancelBy = witness.validAfter − cancellationSafetySeconds`, exactly as in the EIP-3009
+binding; the remaining-safe-interval check and the record's three timestamps use it
+unchanged. The safety margin here MUST additionally cover the payer's own transaction
+inclusion, since cancellation under this binding is payer-broadcast rather than relayed.
+
 ## Intent binding profiles
 
 Both profiles of the flow document's Intent binding section apply, with one constraint

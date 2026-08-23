@@ -102,9 +102,10 @@ intent record for `principal-protected` deployments.
 settle later. In addition to ordinary `exact`/EIP-3009 checks, the facilitator MUST:
 
 1. use a recent chain-head timestamp, not local wall time alone;
-2. verify `validAfter` is in the future and its remaining delay is within the
-   advertised `coolingOffSeconds` plus a declared tolerance that is a small fraction of
-   the window; a large clock discrepancy MUST be reported, not silently accepted;
+2. verify `validAfter` is in the future and its remaining delay is within
+   `coolingOffSeconds` **± a declared tolerance** (two-sided: materially short and
+   implausibly long are both rejected), the tolerance being a small fraction of the
+   window; a large clock discrepancy MUST be reported, not silently accepted;
 3. verify `validBefore == validAfter + maxTimeoutSeconds` (subject only to a documented
    base-scheme tolerance);
 4. verify `0 < cancellationSafetySeconds <= 0.25 × coolingOffSeconds`, and that the
@@ -138,12 +139,12 @@ recovery scans every non-terminal record; a memory timer or a held-open request 
 conformant.
 
 **Settle promptly, and make the delay observable.** The worker MUST broadcast at the
-first observed eligible block. Its retry schedule MUST be bounded and declared —
-"retrying" is not a licence to choose a better price — is always bounded by
-`validBefore`, and the status record MUST expose the interval between first
-eligibility and broadcast. `validBefore − validAfter` is otherwise a free timing option
-written by the payer: the payer's window is bounded and advertised, so the payee's must
-be too.
+first observed eligible block. Its retry schedule MUST be bounded, MUST be declared in
+the advertised `cooling-off` extension, and is in any case cut off at `validBefore` —
+"retrying" is not a licence to choose a better price. The status record MUST expose the
+interval between first eligibility and broadcast. `validBefore − validAfter` is
+otherwise a free timing option written by the payer: the payer's window is bounded and
+advertised, so the payee's must be too.
 
 ## Cancellation
 
@@ -160,7 +161,7 @@ a broadcast path independent of the merchant. Conforming wallet patterns: an ext
 policy signer (HSM/policy service with a separately authenticated human channel), or an
 ERC-1271 smart account whose policy accepts an agent session key for transfers and an
 independent owner/recovery signature for cancellation — the session key MUST NOT be
-able to remove the recovery policy during the window. A separate `cancelAuthority` EOA
+able to remove or block the recovery policy during the window. A separate `cancelAuthority` EOA
 field is deliberately not defined: the token would reject it; separation is a wallet
 custody property.
 
@@ -179,14 +180,21 @@ capability); a failed registration means that relay MUST NOT be advertised for t
 payment. A relay MUST bind requests to pre-registered records, verify fields and
 signature, accept durably before returning `relay_accepted`, broadcast promptly, treat
 the eventual event as the only proof, be idempotent, and MUST NOT pay gas for arbitrary
-nonces — an open endpoint doing so is a gas-drain vector. Registration endpoints MUST
-be authenticated and quota-limited. A relay MAY attempt a post-`cancelBy` cancellation
-but MUST mark it `raceable: true`.
+nonces — an open endpoint doing so is a gas-drain vector. A relay SHOULD send an
+authenticated, idempotent cancellation notification to the coordinator (the
+coordinator's mandatory pre-broadcast nonce re-read remains the fallback when it does
+not arrive). Registration endpoints MUST be authenticated, quota-limited, and available
+only to approved coordinators or an equivalent funded-client admission mechanism —
+authentication alone still permits an open-signup registrar, which reopens the
+subsidized-gas-drain vector. A relay MAY attempt a post-`cancelBy` cancellation but
+MUST mark it `raceable: true`.
 
 Outcome vocabulary: `202 cancel_requested` / `202 relay_accepted` (accepted, not yet
 chain-final), `200 canceled` (finalized event), `400 invalid_cancellation_signature`,
-`404 unknown_payment`, `409 already_settled` / `settlement_in_flight` /
-`cancel_window_elapsed`, `503 relay_unavailable`.
+`404 unknown_payment`, `409 already_settled` / `settlement_in_flight`,
+`409 cancel_window_elapsed` (a relay's optional refusal of a late request — the
+coordinator itself accepts late cancellations and reports them raceable),
+`503 relay_unavailable`.
 
 ## Race and cutoff
 
