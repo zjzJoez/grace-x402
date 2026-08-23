@@ -125,8 +125,42 @@ The minimum state machine is:
 | `settlement_submitted` | No | settlement transaction submitted; outcome not final |
 | `settled` | Yes | settlement event/receipt meets finality policy |
 | `canceled` | Yes | cancellation event meets finality policy |
-| `failed` | Yes | deterministic failure or exhausted retry policy |
+| `failed` | Yes | the authorization is provably unexecutable — see below |
+| `blocked` | **No** | settlement cannot proceed right now, but the authorization is still live |
 | `expired` | Yes | settlement did not succeed before the binding deadline |
+
+### `failed` is narrower than it looks
+
+A state is terminal only when the signed capability can never execute again. That is a
+property of the authorization, not of the coordinator's mood or its retry counter. A
+resource server MAY declare `failed` only on:
+
+- the deadline having passed (which is `expired`);
+- a cancellation that meets the binding's finality policy;
+- a settlement that already succeeded (which is `settled`); or
+- an immutable defect in the payload itself — malformed, wrong payee, bad signature.
+
+Everything else is `blocked`, and `blocked` is **not** terminal:
+
+| Condition | Why it is not terminal |
+| :-- | :-- |
+| insufficient balance | the payer can top up before `validBefore` |
+| missing or revoked approval | it can be re-granted |
+| RPC or relay unavailable | the ledger is unaffected |
+| retry budget exhausted | that is a fact about the coordinator, not the authorization |
+
+The distinction is load-bearing, and getting it wrong harms exactly the person this
+flow exists to protect. A signed authorization is a **bearer capability**: under
+`transferWithAuthorization` anyone holding the payload can submit it, and the Permit2
+proxy is likewise a public entrypoint. So a coordinator that hits "insufficient funds",
+declares `failed`, and disables fulfilment has not stopped anything — the funds can
+return and the payment can still land, leaving a charged payer with no goods.
+
+Therefore a resource server MUST continue reconciling `blocked` records against the
+ledger through `validBefore`, and MUST NOT release the payer from the obligation while
+the capability remains executable. A coordinator that wants to abandon an order before
+its deadline MUST first obtain a cancellation that meets the finality policy, or wait
+for expiry; it MUST NOT promise terminal failure it cannot enforce.
 
 The transition from `pending` to either `cancel_requested` or
 `settlement_submitted` MUST use an atomic compare-and-set. Once cancellation is durably
@@ -143,11 +177,13 @@ On startup and periodically, the coordinator MUST scan non-terminal records:
 - handle a dropped/replaced/reorganized transaction without fulfilling early; and
 - expire records that cannot settle inside the binding deadline.
 
-Retries MUST be idempotent. Transient RPC, fee, or mempool errors MAY be retried; a
-deterministic invalid signature, used/canceled nonce, insufficient balance, or expired
-authorization is reconciled to a terminal result. If a network exposes only a boolean
-used/canceled state, the coordinator MUST inspect the corresponding events to determine
-which terminal outcome occurred.
+Retries MUST be idempotent. An invalid signature, a used or canceled nonce, and an
+expired authorization reconcile to a terminal result, because none of them can become
+executable again. Transient RPC, fee, and mempool errors, insufficient balance, and a
+missing approval move the record to `blocked` and stay under reconciliation until
+`validBefore` — see [`failed` is narrower than it looks](#failed-is-narrower-than-it-looks).
+If a network exposes only a boolean used/canceled state, the coordinator MUST inspect
+the corresponding events to determine which terminal outcome occurred.
 
 ## Pending and status transport
 
@@ -226,6 +262,7 @@ and in `PAYMENT-RESPONSE`. Terminal mappings are:
 | `settled` | `true` | omitted | settlement hash |
 | `canceled` | `false` | `canceled_by_client` | cancellation hash |
 | `failed` | `false` | specific stable reason | hash if one exists, otherwise empty |
+| `blocked` | `false` | specific stable reason | empty — **non-terminal**, the record remains under reconciliation |
 | `expired` | `false` | `authorization_expired` | empty |
 
 Status and cancellation URLs MUST be unguessable or separately access-controlled, use
@@ -319,14 +356,55 @@ The payment authorization signs payment fields, not the application order. Two p
 A resource server offering this flow:
 
 - MUST set `accepts[].extra.paymentFlow` to `"cooling-off"`;
-- MUST advertise all binding timing parameters;
+- MUST advertise all binding timing parameters, **including the effective decision
+  interval** (see below);
 - MUST return only a contingent commitment before settlement;
 - MUST keep fulfilment disabled until terminal settlement finality;
-- MUST expose durable status and an authenticated cancellation path; and
+- MUST expose durable status and an authenticated cancellation path;
+- MUST bound a single payer's concurrent exposure (see below); and
 - MUST retain enough audit data to reconcile its application order with the ledger.
 
-It MAY reserve reversible capacity during the window, but SHOULD rate-limit repeated
-commit/cancel griefing and MUST NOT describe a reversible hold as fulfilment.
+### Advertise the interval the human actually gets
+
+The window a payer can act in is not `coolingOffSeconds`; it is
+`coolingOffSeconds − cancellationSafetySeconds`, and both are the resource server's own
+parameters. Nothing stops a server advertising a 90-second window with an 89-second
+safety margin — conformant, and a one-second decision.
+
+A resource server MUST therefore advertise the **effective decision interval** it is
+offering, as an absolute deadline (`cancelBy`) or an explicit duration, in the same
+`PaymentRequired` the client reads before signing. Any consumer-facing claim about the
+window MUST quote that number, not `coolingOffSeconds`. A safety margin is a network
+buffer; a server whose margin consumes most of its window is not offering a cooling-off
+period, and the payload should say so before a signature exists rather than after.
+
+### A cancelled quote is dead
+
+A `PaymentRequired` is single-use. After `canceled`, `expired`, or `failed`, the
+resource server MUST issue a fresh quote and MUST NOT honour the previous one's price
+on retry.
+
+Without that rule the window is a free option on the price: a payer watches, cancels
+when the quote moves against the merchant, and re-buys at the stale number. At 90
+seconds on a same-currency stablecoin the option is worth a rounding error, so this
+costs honest deployments nothing — but its value scales with the square root of the
+window, so a server offering hours rather than seconds is selling something quite
+different, and SHOULD bound `coolingOffSeconds` accordingly when the payment asset is
+not the unit of account of the advertised price.
+
+### Bound one payer's concurrent exposure
+
+Funds are not reserved, so verification proves only that the payer could pay *this*
+authorization. One wallet holding a single unit price satisfies verification for an
+unbounded number of simultaneous commitments — which is a cheap way to exhaust a
+merchant's scarce capacity without ever spending anything.
+
+A resource server MUST cap the sum of a payer's outstanding `cooling-off` commitments
+at that payer's verified balance, and MUST NOT reserve scarce or non-fungible capacity
+for such a commitment without separate, non-refundable consideration. It MUST rate-limit
+repeated commit/cancel cycles, keyed on payer **and** on the contended resource, since
+a payer address costs one funding transfer to replace. It MAY reserve reversible
+capacity, and MUST NOT describe a reversible hold as fulfilment.
 
 ## Security considerations
 

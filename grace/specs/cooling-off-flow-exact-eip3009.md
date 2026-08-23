@@ -214,6 +214,19 @@ make execution idempotent. The worker MUST re-read the record and on-chain nonce
 immediately before broadcast. It retries transient errors only while a successful
 transaction can still land before `validBefore`.
 
+**Settle promptly, and make the delay observable.** The worker MUST broadcast at the
+first observed block with `timestamp > validAfter`, subject only to its retry policy,
+and the status record MUST expose the interval between that first eligible block and
+the broadcast.
+
+This is not tidiness. `validBefore = validAfter + maxTimeoutSeconds` leaves the payee a
+span — an hour, at this document's own example value — in which it may choose *when* to
+execute a fixed-price claim it already holds. Unconstrained, that is a free timing
+option written by the payer, and on a volatile pair it is worth several times the
+90-second option the payer gets. The payer's window is bounded and advertised; the
+payee's must be too. A payee that wants discretion over settlement timing should say so
+in `maxTimeoutSeconds` rather than take it silently.
+
 The coordinator MUST recover after restart by scanning every non-terminal record,
 finishing or abandoning `preparing` registration, re-arming pending jobs, and reconciling
 submitted hashes and token events. A memory timer, an open 90-second HTTP request, or a
@@ -451,11 +464,18 @@ machine encodes explicit priority.
 | :-- | :-- | :-- |
 | `settled` | expected transfer plus `AuthorizationUsed`, final | `success: true`, settlement hash |
 | `canceled` | `AuthorizationCanceled`, final | `success: false`, `canceled_by_client`, cancellation hash |
-| `failed` | deterministic failure or exhausted bounded retry | specific stable reason |
-| `expired` | chain time/deadline makes settlement impossible | `authorization_expired` |
+| `failed` | an immutable defect in the payload itself | specific stable reason |
+| `expired` | chain time past `validBefore` makes settlement impossible | `authorization_expired` |
+
+Insufficient balance is **not** on that list. `transferWithAuthorization` is callable by
+anyone holding the payload, so an unspent authorization stays executable until
+`validBefore` no matter what the payer's balance reads today; the record is `blocked`
+and remains under reconciliation. Treating it as terminal is how a payer ends up
+charged for an order the merchant already wrote off — see
+[`failed` is narrower than it looks](cooling-off-payment-flow.md#failed-is-narrower-than-it-looks).
 
 The resource server MUST NOT fulfil in `pending`, `cancel_requested`,
-`settlement_submitted`, `failed`, or `expired`.
+`settlement_submitted`, `blocked`, `failed`, or `expired`.
 
 An `authorizationState == true` read without event reconciliation is insufficient to
 classify settled versus canceled.

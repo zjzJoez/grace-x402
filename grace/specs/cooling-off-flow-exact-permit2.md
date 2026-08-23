@@ -158,7 +158,7 @@ Unchanged call — `x402ExactPermit2Proxy.settle(...)` — scheduled at
 | Nonce occupied, cause unproven | `InvalidNonce` revert without that evidence | `nonce_unavailable` — MUST NOT be reported as `canceled` |
 | Broadcast too early | `PaymentTooEarly()` | facilitator scheduling defect |
 | Missed deadline | Permit2 `SignatureExpired` | facilitator scheduling defect |
-| Payer spent funds / revoked Permit2 approval | ERC-20 / allowance revert | failure; lost sale, never a lost good |
+| Payer spent funds / revoked Permit2 approval | ERC-20 / allowance revert | **`blocked`, not terminal** — the balance can return and the approval can be re-granted, and the proxy is a public entrypoint, so the capability stays live until `deadline`. Keep reconciling; do not release the payer. |
 
 The race, cutoff, and confirmation rules of the flow document apply unchanged; the
 cancellation clock gate is the nonce bitmap, not `validAfter`, so the payer's veto
