@@ -31,10 +31,17 @@ const client = publicClientFor(net)
 const G = (s) => `\x1b[32m${s}\x1b[0m`
 const R = (s) => `\x1b[31m${s}\x1b[0m`
 const D = (s) => `\x1b[2m${s}\x1b[0m`
-let pass = 0, fail = 0
-const check = (ok, label, detail = '') => {
+let pass = 0, fail = 0, onchain = 0
+/**
+ * `chain: true` marks an assertion whose outcome is decided by live contract
+ * state — an eth_call the deployed token answers. Everything else is a local
+ * property of this library. Both are worth asserting; conflating them would
+ * inflate what the suite claims to prove, so the summary counts them apart.
+ */
+const check = (ok, label, detail = '', chain = false) => {
   console.log(`  ${ok ? G('PASS') : R('FAIL')}  ${label}${detail ? D('  — ' + detail) : ''}`)
   ok ? pass++ : fail++
+  if (ok && chain) onchain++
 }
 
 const payer = privateKeyToAccount(generatePrivateKey())
@@ -56,7 +63,7 @@ const pending = await signDeferredPayment(payer, net, {
 
 const early = await simulateSettle(net, pending, client)
 check(early.reason === REVERTS.tooEarly,
-  'merchant settling inside the window reverts', early.reason)
+  'merchant settling inside the window reverts', early.reason, true)
 check(early.state === 'cooling-off', 'classified as cooling-off for the UI')
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,7 +77,7 @@ const matured = await signDeferredPayment(payer, net, {
 })
 const late = await simulateSettle(net, matured, client)
 check(late.reason === REVERTS.noFunds,
-  'time gate opens; only the (empty) balance objects', late.reason)
+  'time gate opens; only the (empty) balance objects', late.reason, true)
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[1m3. Only the payee can settle — receiveWithAuthorization binds the caller\x1b[0m')
@@ -87,7 +94,7 @@ try {
   wrongCaller = null
 } catch (e) { wrongCaller = revertReason(e) }
 check(wrongCaller === REVERTS.wrongCaller,
-  'a third party holding the signature cannot cash it', wrongCaller)
+  'a third party holding the signature cannot cash it', wrongCaller, true)
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[1m4. The payer\'s cancellation signature is accepted by the contract\x1b[0m')
@@ -96,13 +103,13 @@ const cancellation = await signCancellation(payer, net, pending.authorization.no
 const cancelSim = await simulateCancel(net, bystander.address, cancellation, client)
 check(cancelSim.ok,
   'cancelAuthorization succeeds, broadcast by a wallet that is NOT the payer',
-  cancelSim.ok ? 'relayable — payer gaslessness depends on an available funded relayer' : cancelSim.reason)
+  cancelSim.ok ? 'relayable — payer gaslessness depends on an available funded relayer' : cancelSim.reason, true)
 
 // A cancellation signed by someone else must not work.
 const forged = await signCancellation(bystander, net, pending.authorization.nonce)
 const forgedSim = await simulateCancel(net, bystander.address,
   { message: { authorizer: payer.address, nonce: pending.authorization.nonce }, v: forged.v, r: forged.r, s: forged.s }, client)
-check(!forgedSim.ok, 'a forged cancellation is rejected', forgedSim.reason)
+check(!forgedSim.ok, 'a forged cancellation is rejected', forgedSim.reason, true)
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[1m5. A spent or cancelled nonce is dead forever\x1b[0m')
@@ -142,7 +149,7 @@ if (!used) {
 {
   const { authorizer, nonce } = used.args
   check((await authorizationState(net, authorizer, nonce, client)) === true,
-    'a nonce from a real AuthorizationUsed event reads spent', `block ${used.blockNumber}`)
+    'a nonce from a real AuthorizationUsed event reads spent', `block ${used.blockNumber}`, true)
 
   const replay = await signDeferredPayment(payer, net, {
     to: merchant.address, amountSgd: 4.5, windowSeconds: -600,
@@ -151,21 +158,32 @@ if (!used) {
   replay.authorization.nonce = nonce
   const dead = await simulateSettle(net, replay, client)
   check(dead.reason === REVERTS.spent,
-    'settling a burned nonce reverts — this is what CANCEL leaves behind', dead.reason)
+    'settling a burned nonce reverts — this is what CANCEL leaves behind', dead.reason, true)
   check(dead.state === 'void', 'classified as void for the UI')
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\n\x1b[1m6. The nonce carries the order — settlement is self-describing\x1b[0m')
+console.log('\n\x1b[1m6. The nonce commits to the order' + D(' (local properties of the commitment, not chain state)') + '\x1b[0m')
 
-const sameOrder = orderNonce(order)
-const reordered = orderNonce({ buyer_agent: 'demo-agent-v1', total_sgd: '4.50', qty: 1, sku: 'AGENTIX-DEMO-001' })
-const tampered = orderNonce({ ...order, total_sgd: '45.00' })
-check(sameOrder === pending.authorization.nonce, 'nonce == keccak256(canonical order)', sameOrder.slice(0, 18) + '…')
+const salt = pending.orderSalt
+const sameOrder = orderNonce(order, salt).nonce
+const reordered = orderNonce({ buyer_agent: 'demo-agent-v1', total_sgd: '4.50', qty: 1, sku: 'AGENTIX-DEMO-001' }, salt).nonce
+const tampered = orderNonce({ ...order, total_sgd: '45.00' }, salt).nonce
+const unsalted = orderNonce(order, 'different-salt').nonce
+check(sameOrder === pending.authorization.nonce, 'the signed nonce re-derives from order + salt', sameOrder.slice(0, 18) + '…')
 check(sameOrder === reordered, 'key order does not change the commitment')
 check(tampered !== sameOrder, 'changing one cent changes the nonce', tampered.slice(0, 18) + '…')
+check(unsalted !== sameOrder, 'the salt is load-bearing — without it the digest is brute-forceable')
+
+// Regression: the old canonicaliser passed an array replacer to JSON.stringify,
+// which applies at every depth, so nested fields vanished and two different
+// orders committed to the same nonce.
+const nestedA = orderNonce({ sku: 'x', meta: { secret: 'A', price: 1 } }, salt).nonce
+const nestedB = orderNonce({ sku: 'x', meta: { secret: 'B', price: 999 } }, salt).nonce
+check(nestedA !== nestedB, 'nested fields are part of the commitment')
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? G('■ all ' + pass + ' checks passed') : R('■ ' + fail + ' of ' + (pass + fail) + ' checks FAILED')}`)
-console.log(D(`  every assertion above ran against live ${net.label} state — no contract deployed, no gas spent\n`))
+console.log(D(`  ${onchain} of them were decided by live ${net.label} contract state via eth_call;`))
+console.log(D(`  the rest are local properties of this library. No contract deployed, no gas spent.\n`))
 process.exit(fail === 0 ? 0 : 1)

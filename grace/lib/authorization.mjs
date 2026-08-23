@@ -30,15 +30,31 @@ import { domainFor, TYPES, DECIMALS } from './xsgd.mjs'
 
 /**
  * The 32-byte nonce is caller-chosen and is the only free field on the wire.
- * GRACE spends it on the order hash, so the settled Avalanche transaction is
- * self-describing: FiatTokenV2_2 emits `AuthorizationUsed(authorizer, nonce)`
- * and `AuthorizationCanceled(authorizer, nonce)`, which makes both outcomes
- * publicly auditable forever with zero cooperation from anyone.
+ * GRACE spends it on an order *commitment*, so `AuthorizationUsed(authorizer,
+ * nonce)` and `AuthorizationCanceled(authorizer, nonce)` bind each outcome to
+ * what was bought — for anyone who is shown the preimage. A hash on its own
+ * reveals nothing, and without the salt below it reveals too much: a bare
+ * order hash over a small catalogue is brute-forceable in milliseconds, which
+ * is why the binding makes the salt a MUST rather than a suggestion.
+ *
+ * `canonical()` is deliberately not `JSON.stringify(order, keys.sort())` — the
+ * array form of the replacer applies at every depth, so any key absent from the
+ * top level is silently dropped from nested objects, and two orders differing
+ * only in nested data would commit to the same nonce.
  */
-export function orderNonce(order) {
+export function orderNonce(order, salt) {
   if (!order) return toHex(crypto.randomBytes(32))
-  const canonical = JSON.stringify(order, Object.keys(order).sort())
-  return keccak256(stringToBytes(canonical))
+  const s = salt ?? toHex(crypto.randomBytes(16))
+  return { nonce: keccak256(stringToBytes(canonical({ order, salt: s }))), salt: s }
+}
+
+/** Deterministic serialisation: keys sorted at every level, arrays in order. */
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`
+  }
+  return JSON.stringify(value ?? null)
 }
 
 export const toAtomic = (sgd) => parseUnits(String(sgd), DECIMALS)
@@ -68,13 +84,19 @@ export async function signDeferredPayment(account, net, opts) {
   const validAfter = BigInt(now + windowSeconds)
   const validBefore = BigInt(now + windowSeconds + ttlSeconds)
 
+  // A salted commitment: the payer keeps the salt, so the order stays private
+  // on-chain and can still be proved to anyone who is shown it.
+  const { nonce, salt } = order
+    ? orderNonce(order, opts.orderSalt)
+    : { nonce: orderNonce(null), salt: null }
+
   const authorization = {
     from: account.address,
     to,
     value: toAtomic(amountSgd),
     validAfter,
     validBefore,
-    nonce: orderNonce(order),
+    nonce,
   }
 
   const signature = await account.signTypedData({
@@ -91,6 +113,7 @@ export async function signDeferredPayment(account, net, opts) {
     // Everything the merchant needs, and nothing it can use early.
     window: { opensAt: Number(validAfter), closesAt: Number(validBefore), seconds: windowSeconds },
     order,
+    orderSalt: salt,
   }
 }
 

@@ -88,6 +88,7 @@ const envelope = {
   accepted: challenge,
   payload: { signature: signed.signature, authorization: wireFormat(signed.authorization) },
   order,
+  orderSalt: signed.orderSalt, // the merchant needs it to re-derive the commitment
 }
 const second = await fetch(`${SERVER}/checkout`, {
   method: 'POST',

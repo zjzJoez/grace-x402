@@ -116,9 +116,16 @@ async function acceptPayment(sku, envelopeB64) {
   })
   if (signer.toLowerCase() !== auth.from.toLowerCase()) throw new Error('signature does not recover to payer')
 
-  // 4. the nonce commits to the order (self-describing settlement)
+  // 4. the nonce commits to the order. The salt travels with the envelope, not
+  //    on-chain: the commitment stays private to anyone who was not shown it,
+  //    and an unsalted digest over a three-item catalogue would be brute-forced
+  //    from the settlement event in milliseconds.
   const order = envelope.order ?? null
-  if (order && orderNonce(order) !== auth.nonce) throw new Error('nonce != keccak256(order)')
+  const orderSalt = envelope.orderSalt ?? null
+  if (order) {
+    if (!orderSalt) throw new Error('order supplied without its salt')
+    if (orderNonce(order, orderSalt).nonce !== auth.nonce) throw new Error('nonce does not commit to this order')
+  }
 
   const id = auth.nonce.slice(2, 10)
   const record = {
@@ -139,6 +146,7 @@ async function acceptPayment(sku, envelopeB64) {
     closesAt: Number(auth.validBefore),
     windowSeconds,
     order,
+    orderSalt, // kept so the commitment can be re-derived for an auditor later
     payer: auth.from,
     authorization: wireFormat(auth),
     signature,
