@@ -22,6 +22,7 @@
 import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { recoverTypedDataAddress } from 'viem'
@@ -122,6 +123,13 @@ async function acceptPayment(sku, envelopeB64) {
   const id = auth.nonce.slice(2, 10)
   const record = {
     id,
+    // Cancelling makes this server sign with the payer's key, so the request has
+    // to prove it came from whoever holds the payment. The token travels only in
+    // the 402 receipt and the payer's own page; orderView strips it before any
+    // public read. Settling stays open on purpose — pressing SETTLE and watching
+    // the chain refuse is the demo, and after the window it only does what the
+    // autopilot would have done anyway.
+    cancelToken: randomBytes(16).toString('hex'),
     sku,
     name: item.name,
     amountSgd: toSgd(auth.value),
@@ -229,8 +237,9 @@ async function liveState(o) {
 
 async function orderView(o) {
   const now = Math.floor(Date.now() / 1000)
+  const { cancelToken, ...visible } = o
   return {
-    ...o,
+    ...visible,
     live: await liveState(o),
     secondsLeft: Math.max(0, o.opensAt - now),
     explorer: net.explorer,
@@ -308,7 +317,7 @@ const server = createServer(async (req, res) => {
         status: 'pending',
         cooling_off_seconds: record.windowSeconds,
         settle_opens_at: record.opensAt,
-        confirm_url: `${PUBLIC_URL}/pay/${record.id}`,
+        confirm_url: `${PUBLIC_URL}/pay/${record.id}?t=${record.cancelToken}`,
         message: `Order accepted. Settlement is chain-blocked until ${new Date(record.opensAt * 1000).toISOString()}. Cancellation near that boundary may race; production clients use an earlier cancelBy safety cutoff.`,
       })
     }
@@ -370,6 +379,9 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && m) {
       const o = orders.get(m[1])
       if (!o) return json(res, 404, { error: 'no such order' })
+      if (m[2] === 'cancel' && url.searchParams.get('t') !== o.cancelToken) {
+        return json(res, 403, { ok: false, reason: 'cancellation requires the payer token from the confirmation page' })
+      }
       try {
         const out = m[2] === 'settle' ? await doSettle(o) : await doCancel(o)
         return json(res, 200, { ok: true, tx: out.hash, explorerUrl: out.explorerUrl, order: await orderView(o) })
@@ -399,7 +411,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/phone') {
       const id = url.searchParams.get('id') ?? [...orders.values()].sort((a, b) => b.createdAt - a.createdAt)[0]?.id
       if (!id) return json(res, 404, { error: 'no orders yet' })
-      return html(res, phonePage(id, PUBLIC_URL))
+      return html(res, phonePage(id, PUBLIC_URL, orders.get(id)?.cancelToken ?? ''))
     }
     if (req.method === 'GET' && path === '/console') return html(res, consolePage(net))
     // The stage bookmark: a phone that opens /pay/latest always lands on the

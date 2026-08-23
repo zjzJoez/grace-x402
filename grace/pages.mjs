@@ -143,6 +143,7 @@ export function payPage(order, net) {
 
   const js = `
   const id = '${order.id}', opensAt = ${order.opensAt}, windowSeconds = ${order.windowSeconds};
+  const cancelToken = '${order.cancelToken ?? ''}';
   let done = false;
   function render(o) {
     const area = document.getElementById('stateArea');
@@ -171,7 +172,7 @@ export function payPage(order, net) {
   }
   async function doCancel(btn) {
     btn.disabled = true; btn.textContent = 'broadcasting cancellation…';
-    const r = await fetch('/api/orders/' + id + '/cancel', { method: 'POST' });
+    const r = await fetch('/api/orders/' + id + '/cancel?t=' + cancelToken, { method: 'POST' });
     const d = await r.json();
     if (!d.ok) { btn.disabled = false; btn.textContent = 'CANCEL — costs you nothing'; alert(d.reason); return; }
     render(d.order);

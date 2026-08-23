@@ -181,8 +181,11 @@ export function missionPage(net, themeKey = 'editorial', showPicker = false) {
       $('mVerdict').innerHTML='<span class="cant">cannot cash it — '+left+'s to go</span>';
       $('pVerdict').innerHTML='<span class="can">payer authority can void it</span>';
       $('mBtn').innerHTML='<button class="bSettle blocked" onclick="act(\\''+o.id+'\\',\\'settle\\',this)">SETTLE anyway →</button>';
-      $('pBtn').innerHTML='<button class="bCancel" onclick="act(\\''+o.id+'\\',\\'cancel\\',this)">CANCEL AUTHORIZATION · demo relay broadcasts</button>'+
-        '<div class="phlink"><a href="/phone?id='+o.id+'">open this on the payer\\'s phone →</a></div>';
+      // No cancel button here on purpose: this is the merchant's screen, and the
+      // merchant cannot void the payer's authorization — only the payer's own
+      // page can, and only with the token issued to it. The asymmetry the whole
+      // design rests on should be visible in the UI, not just asserted in prose.
+      $('pBtn').innerHTML='<div class="phlink"><a href="/phone?id='+o.id+'">the payer cancels from their own device →</a></div>';
       $('mQuote').style.display='block'; $('mQuote').className='quote';
       $('mSaid').textContent='"'+(o.live.reason||'…')+'"';
       $('ringCap').innerHTML='the same number means<br><b>"not yet yours"</b> to the merchant<br>and <b>"still yours"</b> to the payer';

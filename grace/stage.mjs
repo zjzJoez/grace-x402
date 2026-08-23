@@ -81,7 +81,8 @@ export function terminalPage() {
 </script></body></html>`
 }
 
-export function phonePage(id, publicUrl) {
+export function phonePage(id, publicUrl, cancelToken = '') {
+  const q = cancelToken ? `?t=${cancelToken}` : ''
   return `<!doctype html><html><head><meta charset="utf-8"><title>GRACE · the payer's phone</title>
 <style>
   ${BASE}
@@ -105,7 +106,7 @@ export function phonePage(id, publicUrl) {
       <p>This page is live at <code>${publicUrl}/pay/${id}</code>. The cancel button signs a real
          <code>cancelAuthorization</code> — the payer's wallet needs no gas, and no permission from anyone.</p>
     </div>
-    <div class="phone"><div class="notch"></div><iframe id="pf" src="/pay/${id}"></iframe></div>
+    <div class="phone"><div class="notch"></div><iframe id="pf" src="/pay/${id}${q}"></iframe></div>
   </div>
 </body></html>`
 }
