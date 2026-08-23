@@ -13,7 +13,7 @@
  */
 
 import { createPublicClient, createWalletClient, http } from 'viem'
-import { ABI, REVERTS } from './xsgd.mjs'
+import { ABI, REVERTS, isWindowHeld } from './xsgd.mjs'
 import { argsFor } from './authorization.mjs'
 
 export function publicClientFor(net) {
@@ -66,7 +66,8 @@ export function revertReason(err) {
  * it is the demo.
  */
 export function classify(reason) {
-  if (reason === REVERTS.tooEarly) {
+  // Issuer-agnostic: USD₮0 says "TetherToken: auth early" for the same condition.
+  if (isWindowHeld(reason)) {
     return { state: 'cooling-off', headline: 'Cannot settle yet', detail: 'The cooling-off window has not closed. The chain is enforcing this, not the merchant.' }
   }
   if (reason === REVERTS.spent) {

@@ -33,6 +33,36 @@ evidence across chains, proxies, and versions. The `principal-protected` profile
 additionally requires the `bytes`-signature overload with ERC-1271 validation (Circle
 FiatToken v2.2 has it via `SignatureChecker`; each deployment still needs checking).
 
+Probed on mainnet (`node grace/token-conformance.mjs`, 2026-08-24 — `eth_call` only,
+throwaway key, no funds). Each row: an authorization dated 120s ahead cannot be settled
+now, and the payer's cancellation is accepted when broadcast by a stranger.
+
+| Asset | Chain | Both primitives | Window revert |
+| :-- | :-- | :--: | :-- |
+| USDC | Base, Avalanche | ✅ | `FiatTokenV2: authorization is not yet valid` |
+| EURC | Base | ✅ | same |
+| XSGD | Avalanche | ✅ | same |
+| USD₮0 (Stargate) | Base | ✅ | **`TetherToken: auth early`** |
+| USDT (native, `.e`) | Ethereum, Avalanche | ❌ no EIP-3009 | — use the [Permit2 binding](cooling-off-flow-exact-permit2.md) |
+
+Two things follow, and both are why the probe rule is normative rather than advisory.
+
+**The window is a property of EIP-3009, not of any issuer.** It holds identically on
+Circle's tokens and on Tether's USD₮0, across two chains, with no cooperation from
+anyone.
+
+**Conforming tokens word the refusal differently.** USD₮0 enforces the window exactly
+as USDC does and says `TetherToken: auth early`. A facilitator matching Circle's string
+reads a correctly held window as an unknown failure — and would reject a conforming
+payment. Implementations MUST classify the window by behaviour (settlement refused
+before `validAfter`, accepted after) or by an allowlist of per-asset strings, never by
+one issuer's wording. `grace/lib/xsgd.mjs` carries the pattern list this repo uses.
+
+**Classic USDT has no EIP-3009 at all** — no `transferWithAuthorization`, no
+`cancelAuthorization`, not even EIP-2612 `permit`. The largest stablecoin in circulation
+is therefore out of reach for this binding, which is the specific reason the Permit2
+binding exists.
+
 ## PaymentRequirements
 
 ```json

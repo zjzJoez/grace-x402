@@ -18,16 +18,20 @@
    one is refused with
    `invalid_exact_evm_payload_authorization_valid_after`. That refusal is the thing
    the proposal exists to change, tested rather than asserted.
-3. **The receipts** — the mainnet transactions linked below, including one settled
+3. **The reach** — `node grace/token-conformance.mjs` · asks eight deployed tokens on
+   three chains whether they carry the primitives. USDC, EURC, XSGD and USD₮0 all hold
+   the window and accept a stranger-relayed cancellation; classic USDT has no EIP-3009
+   and reaches the same flow through the Permit2 binding. No funds, no gas.
+4. **The receipts** — the mainnet transactions linked below, including one settled
    by a scheduler with no human in the loop.
-4. **The proposal** — [`grace/specs/`](grace/specs) · the flow and its two bindings,
+5. **The proposal** — [`grace/specs/`](grace/specs) · the flow and its two bindings,
    written against the x402 spec templates, under discussion in
    [x402-foundation/x402#3182](https://github.com/x402-foundation/x402/issues/3182)
    and [#3208](https://github.com/x402-foundation/x402/issues/3208).
-5. **The screen** — `node grace/server.mjs`, then <http://localhost:4021> · the live
+6. **The screen** — `node grace/server.mjs`, then <http://localhost:4021> · the live
    rail runs locally. Press *SETTLE anyway* during a window and read the token
    contract's own refusal; open the payer's page and cancel for real.
-6. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
+7. **The minute** — the [1-minute demo video](https://drive.google.com/file/d/1ZJzYq1PoK63VeHTzB_PIGbRwee5hr6Dg/view):
    every frame in it is a real mainnet transaction.
 
 > The hosted demo that was at `13.212.242.21` ran on hackathon-provided AWS and went
@@ -86,6 +90,12 @@ Today's answers both fail the same way: escrow contracts and PSP holds *take the
 money first* in order to maybe give it back later.
 
 ## The mechanism: one field, already deployed
+
+This is a property of EIP-3009, not of any one token. Verified on mainnet against USDC
+(Base and Avalanche), EURC, XSGD and Tether's USD₮0 — every one holds the window and
+accepts a cancellation relayed by a stranger. Classic USDT has no EIP-3009 at all and
+is served by the Permit2 binding instead, which needs no token support whatsoever, so
+between the two bindings the flow reaches **any ERC-20** with no new contract anywhere.
 
 XSGD is Circle-standard FiatTokenV2_2. Every EIP-3009 authorization carries
 `validAfter` — and every production integration sets it to a time in the past.

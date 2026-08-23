@@ -2,10 +2,11 @@
 
 > Proposed addition to `x402-specification-v2.md` §6.1. Two EVM bindings, both with
 > zero new contracts: [`cooling-off-flow-exact-eip3009.md`](cooling-off-flow-exact-eip3009.md)
-> (gasless payer cancel, EIP-3009 tokens) and
+> (gasless payer cancel; verified on mainnet USDC, EURC, XSGD and USD₮0) and
 > [`cooling-off-flow-exact-permit2.md`](cooling-off-flow-exact-permit2.md)
-> (payer-gas cancel, any ERC-20 — the on-chain window check already ships in
-> x402's own `x402ExactPermit2Proxy`).
+> (payer-gas cancel, any ERC-20 including classic USDT — the on-chain window check
+> already ships in x402's own `x402ExactPermit2Proxy`). Between them the flow reaches
+> every ERC-20 without a single new contract.
 
 ## Summary
 

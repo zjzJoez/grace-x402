@@ -165,12 +165,27 @@ export const REVERTS = {
   spent: 'FiatTokenV2: authorization is used or canceled',
   wrongCaller: 'FiatTokenV2: caller must be the payee',
   // Measured, not assumed: a well-formed signature over a different message
-  // reverts with this. `EIP712: invalid signature` was in here for weeks and the
-  // deployed contract never emits it — in a file whose header claims everything
-  // was read off the live contracts.
+  // reverts with this. `EIP712: invalid signature` sat here for weeks and the
+  // deployed contract never emits it — in a file that claims to quote live ones.
   badSig: 'FiatTokenV2: invalid signature',
   noFunds: 'ERC20: transfer amount exceeds balance',
 }
+
+/**
+ * The same rule, worded by whoever deployed the token. USD₮0 enforces the window
+ * exactly as USDC does and says `TetherToken: auth early`; matching Circle's
+ * string alone would read a correctly held window as an unknown failure, which
+ * is precisely the mistake the binding's "probe the contract, not the name"
+ * rule exists to prevent. Run `node grace/token-conformance.mjs` to see both.
+ */
+export const WINDOW_HELD = [
+  /authorization is not yet valid/i,  // Circle FiatToken (USDC, EURC, XSGD, …)
+  /auth early/i,                      // Tether USD₮0
+  /too early/i,                       // x402ExactPermit2Proxy PaymentTooEarly
+]
+
+/** Is this revert the cooling-off window doing its job, whoever issued the token? */
+export const isWindowHeld = (reason) => WINDOW_HELD.some((re) => re.test(String(reason ?? '')))
 
 export function pickNetwork(name = process.env.GRACE_NETWORK ?? 'mainnet') {
   const net = NETWORKS[name]

@@ -1,9 +1,11 @@
 # `cooling-off` binding for `exact` on EVM (`permit2`)
 
-> Second binding of the [`cooling-off` payment flow](cooling-off-payment-flow.md).
-> Works for **any ERC-20**, not only EIP-3009 tokens. The on-chain window check
-> already ships in x402's own deployed contracts; the payer-side cancel is a
-> canonical Permit2 call. No new contract is required.
+> Second binding of the [`cooling-off` payment flow](cooling-off-payment-flow.md), and
+> the one that reaches **any ERC-20**. This is not a fallback: classic USDT — the
+> largest stablecoin in circulation — has no EIP-3009 and no EIP-2612, so the
+> [EIP-3009 binding](cooling-off-flow-exact-eip3009.md) cannot serve it and this one
+> can. The on-chain window check already ships in x402's own deployed contracts; the
+> payer-side cancel is a canonical Permit2 call. No new contract is required.
 
 ## Summary
 
@@ -48,7 +50,7 @@ Measured on Base mainnet (2026-08-19): `invalidateUnorderedNonces(0, 1)` estimat
 | | `eip3009` binding | `permit2` binding |
 | :-- | :-- | :-- |
 | Cancel authorization | payer-signed meta-tx — **any relayer may broadcast**; payer needs no native gas (relay availability caveats apply) | **payer's own transaction** — ~46k gas, payer MUST hold native currency on the chain |
-| Token coverage | EIP-3009 tokens (USDC, XSGD, EURC, FiatToken derivatives) | **any ERC-20** (one-time Permit2 approval prerequisite, as in stock `exact`/`permit2`) |
+| Token coverage | EIP-3009 tokens only — USDC, EURC, XSGD, USD₮0 verified; **classic USDT excluded** | **any ERC-20, including classic USDT** (one-time Permit2 approval prerequisite, as in stock `exact`/`permit2`) |
 | Window enforcement | token contract (`authorization is not yet valid`) | `x402ExactPermit2Proxy` (`PaymentTooEarly`), validAfter signature-bound via the Witness |
 | Cancel finality signal | `AuthorizationCanceled` — conclusive on its own | `UnorderedNonceInvalidation` — **not conclusive on its own**, see [Cancellation evidence](#cancellation-evidence-is-not-the-event-alone) |
 
