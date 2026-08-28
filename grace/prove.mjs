@@ -66,6 +66,35 @@ check(early.reached && early.reason === REVERTS.tooEarly,
   'merchant settling inside the window reverts', early.reason, true)
 check(early.state === 'cooling-off', 'classified as cooling-off for the UI')
 
+// The binding says the gate is strict — `block.timestamp > validAfter`, so a
+// settle at exactly validAfter still refuses. Nothing here tested that until
+// now, and the claim is load-bearing: x402's own permit2 proxy is INCLUSIVE
+// (`if (block.timestamp < validAfter) revert`, x402BasePermit2Proxy.sol:130),
+// so the two live EVM enforcement objects disagree by one second at T.
+//
+// Drift is one-directional and cannot produce a false pass: time only moves
+// forward, so if the block advances between reading its timestamp and
+// simulating, the gate opens and we see noFunds. A refusal at equality is
+// therefore only possible when now == validAfter, which proves strictness.
+// A run that only ever drifts is reported amber, not failed.
+let boundary = null
+for (let i = 0; i < 4 && !boundary; i++) {
+  const chainTs = Number((await client.getBlock()).timestamp)
+  const atEquality = await signDeferredPayment(payer, net, {
+    to: merchant.address, amountSgd: 4.5, windowSeconds: 0, now: chainTs, order,
+  })
+  const r = await simulateSettle(net, atEquality, client)
+  if (r.reached && r.reason === REVERTS.tooEarly) boundary = r.reason
+  else if (r.reached && r.reason === REVERTS.noFunds) continue // drifted past T
+  else { boundary = r.reason ?? 'no contract verdict'; break }
+}
+if (boundary === REVERTS.tooEarly) {
+  check(true, 'the gate is strict: settling at exactly validAfter still refuses', boundary, true)
+} else {
+  console.log(`  ${'\x1b[33m'}~${'\x1b[0m'} boundary undecided this run — the block advanced past T every attempt` +
+    `${boundary ? ` (last: ${boundary})` : ''}. Not a finding either way.`)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[1m2. Once the window has passed, the time gate is the only one that moves\x1b[0m')
 

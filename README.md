@@ -8,7 +8,7 @@
 
 ## The 90-second tour
 
-1. **The proof** — `npm i && node grace/prove.mjs` · 16 checks, 8 of them decided
+1. **The proof** — `npm i && node grace/prove.mjs` · 17 checks, 9 of them decided
    by the deployed token itself against live mainnet state. No keys, no gas.
    Start here: it needs nothing from me.
 2. **The gap, reproduced** — `node grace/facilitator-probe.mjs` · sends two payloads
@@ -154,7 +154,7 @@ Full loop executed on Avalanche C-Chain (43114) against live XSGD:
 | settle after cancel | reverts forever: `FiatTokenV2: authorization is used or canceled` |
 | un-cancelled order settles | [`receiveWithAuthorization` tx](https://snowtrace.io/tx/0xf6ccdc44fdc93ad3bc46242f41f9e636cad43c90e5202f2e89fee73525c593db) — S$4.50 settled, final |
 
-Plus `prove.mjs`: 16 checks, of which 8 are answered by the deployed contract via
+Plus `prove.mjs`: 17 checks, of which 9 are answered by the deployed contract via
 `eth_call` (payee binding, forged-cancel rejection, burned-nonce replay, the window
 gate itself) and the rest are local properties of the commitment. No contract
 deployed, no gas spent. The suite prints the split rather than counting them as one
@@ -215,7 +215,7 @@ be measured rather than asserted.
 
 ```bash
 npm i                                   # viem only
-node grace/prove.mjs                    # 16 checks, 8 decided on mainnet — no keys, no gas
+node grace/prove.mjs                    # 17 checks, 9 decided on mainnet — no keys, no gas
 node grace/server.mjs                   # merchant → http://localhost:4021
 node grace/agent.mjs --sku tee-agentix --server http://localhost:4021 [--brain]
 ```
