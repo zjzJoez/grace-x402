@@ -90,6 +90,12 @@ access-controlled, SHOULD be encrypted at rest, and `statusUrl` MUST NOT expose 
 
 ## State machine
 
+These are the **coordinator's internal** states, not wire `status` values, and one name
+collides deliberately: internal `pending` means verified-and-durably-scheduled, which is
+*pre*-broadcast, whereas #3208's wire `pending` is post-broadcast only. An internal
+`pending` therefore surfaces on the wire as `deferred_until(T, basis: enforced)`, never as
+`pending`. Internal `blocked` and `settled` do map to the wire states of the same name.
+
 | State | Terminal | Meaning |
 | :-- | :--: | :-- |
 | `preparing` | No, internal | verified; durable registration incomplete; no 202 yet |
@@ -159,12 +165,13 @@ reason** (written here as `deferred_until`), an empty `transaction`, and a
 `cooling-off` extension carrying `state`, `paymentId`, `settleableAt`, `cancelBy`,
 `expiresAt`, `statusUrl`, `cancelUrl`, and any `relayCancelUrls`.
 
-This flow depends on the status vocabulary proposed in
-[x402-foundation/x402#3208](https://github.com/x402-foundation/x402/issues/3208)
-(as amended there: `settled` / post-broadcast `pending` / `deferred_until(T, basis)` /
-`canceled(by)` / `expired`; this flow additionally needs `blocked`, which maps to none
-of those five and belongs in that thread as a proposed sixth rather than smuggled into
-`pending`). The dependency is real: `settlement_pending` MUST NOT be
+This flow depends on the status vocabulary of
+[x402-foundation/x402#3208](https://github.com/x402-foundation/x402/issues/3208),
+now filed as a spec amendment: six states — `settled` / post-broadcast `pending` /
+`deferred_until(T, basis)` / `blocked` / `canceled(by)` / `expired` — each REQUIRED to
+name the on-chain object a reader can check, or to name that it has none. `blocked` was
+this flow's own ask and went in; `basis` carries `enforced` only, `scheduled` having been
+dropped as a state with no situation. The dependency is real: `settlement_pending` MUST NOT be
 reused for the pre-settlement response, because §5.3/§9 require a non-empty
 `transaction` with it — #3083 defined it to mean "broadcast, confirmation unknown", and
 a payment that has not been broadcast has no hash to name. Until a non-terminal reason
