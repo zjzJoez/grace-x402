@@ -27,7 +27,8 @@
  *     total at all — a census with a hole in it is not a census, and a
  *     transport failure is not a finding.
  *   - Negative control: the neighbouring vanity address, which has no code,
- *     must return zero over the same range. If the control ever returns rows,
+ *     must return zero over the first 200,000 blocks after deployment — the
+ *     densest stretch of the sweep, not the whole range. If the control ever returns rows,
  *     the query is not doing what it claims and the run is void.
  */
 
@@ -184,7 +185,7 @@ if (holes > 0) {
 }
 if (ctl === null) { console.log(Y('~ negative control unresolved — the run proves nothing without it.\n')); process.exit(1) }
 if (ctl.length !== 0) { console.log(R(`■ negative control returned ${ctl.length} rows. The query is void.\n`)); process.exit(1) }
-console.log(`${G('✓')} negative control: ${CONTROL} (no code) returns 0 logs over the same range`)
+console.log(`${G('✓')} negative control: ${CONTROL} (no code) returns 0 logs over the first 200k blocks after deployment`)
 
 console.log(`\n${G(`■ ${total} logs in ${seenTx.size} distinct transactions`)}, blocks ${firstBlock} → ${lastBlock}`)
 for (const [name, n] of [...byTopic].sort((a, b) => b[1] - a[1])) console.log(`    ${String(n).padStart(6)}  ${name}`)

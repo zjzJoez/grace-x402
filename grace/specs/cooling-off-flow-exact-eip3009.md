@@ -251,9 +251,9 @@ escrow.
 | State | Required evidence | x402 result |
 | :-- | :-- | :-- |
 | `settled` | expected transfer plus `AuthorizationUsed`, final | `success: true`, settlement hash |
-| `canceled` | `AuthorizationCanceled`, final | `success: false`, `canceled_by_client`, cancellation hash |
+| `canceled` | `AuthorizationCanceled`, final | `success: false`, `authorization_canceled`, cancellation hash |
 | `failed` | an immutable defect in the payload itself | specific stable reason |
-| `expired` | chain time past `validBefore` | `authorization_expired` |
+| `expired` | chain time past `validBefore` | `invalid_exact_evm_payload_authorization_valid_before` |
 
 Insufficient balance is **not** on the list: the authorization stays executable by any
 payload holder until `validBefore` regardless of today's balance, so the record is
@@ -291,7 +291,7 @@ unchanged for `exact`, gated when `paymentFlow` is `cooling-off`
 ## Evidence and limits
 
 Reference implementation: <https://github.com/zjzJoez/grace-x402> — merchant, buying
-agent, an `at(validAfter)` scheduler, and `prove.mjs`, 16 assertions of which 8 are
+agent, an `at(validAfter)` scheduler, and `prove.mjs`, 17 assertions of which 9 are
 decided by the deployed XSGD contract on Avalanche C-Chain via `eth_call` (window gate,
 strict boundary at `validAfter`, payee binding, relayed and forged cancellation,
 burned-nonce replay, same-signature maturation), no keys, no gas. Mainnet transactions:

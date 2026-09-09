@@ -181,7 +181,14 @@ export const REVERTS = {
 export const WINDOW_HELD = [
   /authorization is not yet valid/i,  // Circle FiatToken (USDC, EURC, XSGD, …)
   /auth early/i,                      // Tether USD₮0
-  /too early/i,                       // x402ExactPermit2Proxy PaymentTooEarly
+  // x402ExactPermit2Proxy reverts the custom error PaymentTooEarly(), selector
+  // 0xa65539fa — never a reason string. The annex source reads "Too early"; the
+  // deployed bytecode does not emit it. Matching the prose and not the selector
+  // is the exact mistake the docstring above warns about, and it was in this
+  // list until the binding was written down. Keep both: the string costs
+  // nothing if some future deployment does use it.
+  /0xa65539fa/i,
+  /too early/i,
 ]
 
 /** Is this revert the cooling-off window doing its job, whoever issued the token? */

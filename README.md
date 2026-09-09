@@ -9,7 +9,9 @@
 ## The 90-second tour
 
 1. **The proof** — `npm i && node grace/prove.mjs` · 17 checks, 9 of them decided
-   by the deployed token itself against live mainnet state. No keys, no gas.
+   by the deployed token itself against live mainnet state. No keys, no gas. The
+   equality-boundary check is skipped, not failed, on a run where the block advances
+   past `validAfter` before the call lands — that run prints 16/8.
    Start here: it needs nothing from me.
 2. **The gap, reproduced** — `node grace/facilitator-probe.mjs` · sends two payloads
    to two live public facilitators, identical but for `validAfter`. Needs a signing key
@@ -135,7 +137,14 @@ The 402 challenge gains two fields, everything else is stock x402:
               "coolingOffSeconds": 90, "settleBySeconds": 3600 } }
 ```
 
-- `coolingOffSeconds: 0` degrades to today's `exact` scheme — fully backwards compatible.
+- `coolingOffSeconds: 0` is stock `exact` in shape, with two caveats a stranger will hit.
+  First, this client stamps `validAfter = now + coolingOffSeconds`
+  ([`lib/authorization.mjs:84`](grace/lib/authorization.mjs)), so at `0` it stamps the signing
+  time — a real timestamp — where stock x402 clients stamp `0`; against a strict EIP-3009 token
+  that still refuses until chain time passes the client's clock. Stamp `0` to match stock
+  exactly. Second, the two bindings differ by a second at `validAfter`: `permit2` compares
+  inclusively (`>=`) and settles immediately; `eip3009` compares strictly (`>`) and clears at
+  the first block whose timestamp exceeds `validAfter`.
 - The window is **declared by the merchant per SKU**: physical goods that ship in
   days cost nothing to protect for 90 seconds; instant digital goods set 0.
   Cooling-off becomes a trust signal merchants compete on, like "free returns".
@@ -154,7 +163,8 @@ Full loop executed on Avalanche C-Chain (43114) against live XSGD:
 | settle after cancel | reverts forever: `FiatTokenV2: authorization is used or canceled` |
 | un-cancelled order settles | [`receiveWithAuthorization` tx](https://snowtrace.io/tx/0xf6ccdc44fdc93ad3bc46242f41f9e636cad43c90e5202f2e89fee73525c593db) — S$4.50 settled, final |
 
-Plus `prove.mjs`: 17 checks, of which 9 are answered by the deployed contract via
+Plus `prove.mjs`: 17 checks (the equality-boundary probe reports amber and is skipped
+when the block drifts past `validAfter`), of which 9 are answered by the deployed contract via
 `eth_call` (payee binding, forged-cancel rejection, burned-nonce replay, the window
 gate itself) and the rest are local properties of the commitment. No contract
 deployed, no gas spent. The suite prints the split rather than counting them as one

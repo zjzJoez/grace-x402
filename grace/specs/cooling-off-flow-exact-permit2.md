@@ -159,7 +159,7 @@ first three are terminal:
 | Outcome | Signal | Report |
 | :-- | :-- | :-- |
 | Settled | transfer executed via proxy | success |
-| Client cancelled | `InvalidNonce` revert **plus** ordered evidence the bit went 0→1 by invalidation before any successful use | terminal `canceled_by_client` — not an error |
+| Client cancelled | `InvalidNonce` revert **plus** ordered evidence the bit went 0→1 by invalidation before any successful use | terminal `authorization_canceled` — not an error |
 | Nonce occupied, cause unproven | `InvalidNonce` revert without that evidence | `nonce_unavailable` — MUST NOT be reported as `canceled` |
 | Broadcast too early | `PaymentTooEarly()` | not an outcome — the record stays live; a facilitator scheduling defect |
 | Missed deadline | Permit2 `SignatureExpired` | terminal `expired` — and a facilitator scheduling defect |
@@ -175,7 +175,7 @@ persists until settlement actually lands — facilitators MUST settle promptly.
 | :-- | :-- |
 | Client SDK | When `paymentFlow == "cooling-off"`: set `witness.validAfter` forward instead of `0`; persist the nonce for cancellation; expose an `invalidateUnorderedNonces` helper and a native-gas-balance warning. |
 | Facilitator `/verify` | Window check above; stop treating future `validAfter` as `ErrPermit2NotYetValid` under this flow. |
-| Facilitator `/settle` | Hold until `validAfter`; map `InvalidNonce` to `canceled_by_client`. |
+| Facilitator `/settle` | Hold until `validAfter`; map `InvalidNonce` to `authorization_canceled`. |
 | Contracts | **Nothing.** The deployed proxy already enforces the window. |
 
 ## Evidence and limits

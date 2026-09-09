@@ -1,5 +1,12 @@
 # Settlement status: draft state table for review
 
+> **Superseded by [x402-foundation/x402#3325](https://github.com/x402-foundation/x402/pull/3325).**
+> Kept as the record of what was posted to issue #3208 for review, not as current text. The filed
+> version renumbers the capability declaration from §5.3.5 to **§5.3.3.1** and replaces the
+> `capability: enforced|absent` shape below with per-state reachability
+> (`reachable` / `unreachable` / `unclaimable`) plus an append-only versioned list carrying
+> `version` and a chain-verifiable `effectiveFrom`. Read the PR for the normative wording.
+
 **Scope.** This amends `SettleResponse` (§5.3.2) with three OPTIONAL fields and adds two subsections, §5.3.3 and §5.3.4. §5.3.5 below is normative in each binding's own scheme specification, not in the core spec. It does **not** touch `VerifyResponse` (§5.4.2): permitting a future `validAfter` to *survive* verification instead of being rejected is a change to verifier behaviour, it belongs to #3182, and it is deliberately out of scope here so that nobody reads its absence as an oversight. Absence of `status` keeps today's exact v2 semantics — vocabulary only, no flow semantics, which is the property @glennquinting praised on 20 Aug and the property I most want to keep.
 
 **Why core and not `extensions/`.** §5.3.2 already has an `extensions` object and `specs/CONTRIBUTING.md` scopes `extensions/` to "optional functionality beyond core payment mechanics", so the lighter shape is available and I am not taking it. The reason is uniform adoption: a reader like merona's index has to interpret every facilitator's settlement, and a status vocabulary that only some responses can legally carry is one an index must treat as absent by default — which is the evidence-free bucket again, one layer up. If the group prefers `extensions/`, that is a real option and I would rather argue it in review than have it assumed.

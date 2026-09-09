@@ -133,7 +133,7 @@ export function whyPage(net) {
 
   <h2>Proof, not promises</h2>
   <p>Everything below happened on Avalanche C-Chain <b>mainnet</b> with real XSGD. Anyone can
-  re-run the 13-check adversarial suite (<code>node grace/prove.mjs</code>) with no keys and
+  re-run the adversarial suite (<code>node grace/prove.mjs</code>) with no keys and
   no gas.</p>
   <table>
     <tr><th>claim</th><th>on-chain evidence</th></tr>

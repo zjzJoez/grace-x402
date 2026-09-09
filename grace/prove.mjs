@@ -191,8 +191,8 @@ for (const span of [2000n, 20000n, 100000n]) {
 
 // A spent nonce is spent forever, so an old one proves the point as well as a
 // fresh one — fall back to a settlement this rail actually performed
-// (tx 0x2addd508…, block 92858267) so the suite runs the same 13 checks on any
-// day, however quiet the recent log window happens to be.
+// (tx 0x2addd508…, block 92858267) so the nonce half of the suite is decided on
+// any day, however quiet the recent log window happens to be.
 if (!used) {
   used = {
     blockNumber: 92858267n,

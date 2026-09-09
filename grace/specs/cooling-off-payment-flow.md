@@ -201,10 +201,17 @@ and in `PAYMENT-RESPONSE`:
 | `settled` | `true` | omitted | settlement hash |
 | `cancel_requested` | `false` | non-terminal cancel-accepted reason | empty until the cancellation lands |
 | `settlement_submitted` | `false` | post-broadcast `pending` reason | broadcast hash |
-| `canceled` | `false` | `canceled_by_client` | cancellation hash |
+| `canceled` | `false` | `authorization_canceled` | cancellation hash |
 | `failed` | `false` | specific stable reason | hash if one exists, else empty |
 | `blocked` | `false` | stable reason, distinguishable from any terminal one | broadcast hash if one exists, else empty |
-| `expired` | `false` | `authorization_expired` | empty |
+| `expired` | `false` | `invalid_exact_evm_payload_authorization_valid_before` | empty |
+
+`authorization_canceled` was written here as `canceled_by_client` before it existed anywhere in
+x402, because these drafts needed a string and §9 had none. That turned out not to be a
+drafting convenience: an omitted `errorReason` does not reach the payer intact — a reader
+substitutes a generic string for it — so a revoked payment and a failed one become the same
+sentence on screen. The code is proposed to §9 in x402-foundation/x402#3325; this table
+tracks the proposed spelling.
 
 Status and cancellation URLs MUST be unguessable or access-controlled, HTTPS, and
 disclose no signature or sensitive order data.

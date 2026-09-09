@@ -138,7 +138,7 @@ if (!conn) {
 
 console.log(`\n\x1b[1mDoes the deployed x402 permit2 proxy hold a future validAfter?\x1b[0m`)
 console.log(D(`  ${PROXY} on Base · ${conn.bytes} bytes of runtime code`))
-console.log(D(`  via ${conn.url} · two eth_calls · no key, no funds, no gas, junk signature\n`))
+console.log(D(`  via ${conn.url} · four eth_calls, two per entry point · no key, no funds, no gas, junk signature\n`))
 
 const now = Math.floor(Date.now() / 1000)
 const runs = []
