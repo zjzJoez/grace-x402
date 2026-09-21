@@ -93,8 +93,8 @@ access-controlled, SHOULD be encrypted at rest, and `statusUrl` MUST NOT expose 
 These are the **coordinator's internal** states, not wire `status` values, and one name
 collides deliberately: internal `pending` means verified-and-durably-scheduled, which is
 *pre*-broadcast, whereas #3208's wire `pending` is post-broadcast only. An internal
-`pending` therefore surfaces on the wire as `deferred_until(T, basis: enforced)`, never as
-`pending`. Internal `blocked` and `settled` do map to the wire states of the same name.
+`pending` therefore surfaces on the wire as `deferred_until(T, basis: enforced)` with
+`errorReason: settlement_deferred`, never as `pending`. Internal `blocked` and `settled` do map to the wire states of the same name.
 
 | State | Terminal | Meaning |
 | :-- | :--: | :-- |
@@ -161,7 +161,7 @@ PAYMENT-RESPONSE: <base64 SettlementResponse>
 ```
 
 with a decoded `SettleResponse` of `success: false`, a **pre-broadcast non-terminal
-reason** (written here as `deferred_until`), an empty `transaction`, and a
+reason** (`settlement_deferred`, the §9 code #3325 proposes for `deferred_until`), an empty `transaction`, and a
 `cooling-off` extension carrying `state`, `paymentId`, `settleableAt`, `cancelBy`,
 `expiresAt`, `statusUrl`, `cancelUrl`, and any `relayCancelUrls`.
 
@@ -203,7 +203,8 @@ and in `PAYMENT-RESPONSE`:
 | `settlement_submitted` | `false` | post-broadcast `pending` reason | broadcast hash |
 | `canceled` | `false` | `authorization_canceled` | cancellation hash |
 | `failed` | `false` | specific stable reason | hash if one exists, else empty |
-| `blocked` | `false` | stable reason, distinguishable from any terminal one | broadcast hash if one exists, else empty |
+| `pending` | `false` | `settlement_deferred` — non-terminal (wire `deferred_until(T, basis: enforced)`) | empty (pre-broadcast) |
+| `blocked` | `false` | `settlement_blocked` — non-terminal; never a borrowed terminal code like `insufficient_funds` | broadcast hash if one exists, else empty |
 | `expired` | `false` | `invalid_exact_evm_payload_authorization_valid_before` | empty |
 
 `authorization_canceled` was written here as `canceled_by_client` before it existed anywhere in
